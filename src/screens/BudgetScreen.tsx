@@ -79,13 +79,17 @@ export function BudgetScreen() {
 
       {setAside.length > 0 && (
         <FoldWindow title="Set aside this month">
-          {setAside.map((l) => (
-            <View key={l.id} style={row}>
-              <Body style={{ flex: 1 }}>{`${LINE_KINDS[l.kind].label}: ${l.name}`}</Body>
-              <Text style={Type.body}>{money(l.amount, cur)}</Text>
-              <CloseButton onPress={() => store.update((s) => removeLine(s, key, l.id))} />
-            </View>
-          ))}
+          {/* One row per item or trip: each Reserve press is its own dated line, shown here as one total. */}
+          {Object.values(Object.groupBy(setAside, (l) => l.plannedId ?? l.tripId ?? l.id)).map((group) => {
+            const l = group![0]
+            return (
+              <View key={l.id} style={row}>
+                <Body style={{ flex: 1 }}>{`${LINE_KINDS[l.kind].label}: ${l.name}`}</Body>
+                <Text style={Type.body}>{money(group!.reduce((a, x) => a + x.amount, 0), cur)}</Text>
+                <CloseButton onPress={() => store.update((s) => group!.reduce((acc, x) => removeLine(acc, key, x.id), s))} />
+              </View>
+            )
+          })}
           <Small>Removing one gives the money back to this month.</Small>
         </FoldWindow>
       )}

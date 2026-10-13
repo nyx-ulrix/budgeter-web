@@ -9,8 +9,7 @@ import {
 import { AppState, LINE_KINDS, LineKind, Plan, Planned, normLine } from '../data/state'
 import { store, useAppState } from '../data/store'
 import {
-  ArtImg, Body, CloseButton, FoldWindow, KeyValue, Label, Page, PixelButton, PixelDialog, PixelField, PixelProgress, PixelSlider, Rule, Small, Window,
-} from '../ui/components'
+  ArtImg, Body, CloseButton, FoldWindow, KeyValue, Label, Page, PixelButton, PixelDialog, PixelField, PixelProgress, PixelSlider, Rule, Small, Window, Side } from '../ui/components'
 import { useNav } from '../ui/nav'
 import { Px, Type } from '../ui/theme'
 import { TripsWindow } from './TripScreen'
@@ -77,6 +76,7 @@ export function BudgetScreen() {
         <Small>Whatever you don't spend becomes savings when the month ends, including money you never budgeted. A month that goes over takes it back out.</Small>
       </FoldWindow>
 
+      <Side>
       {setAside.length > 0 && (
         <FoldWindow title="Set aside this month">
           {/* One row per item or trip: each Reserve press is its own dated line, shown here as one total. */}
@@ -107,6 +107,7 @@ export function BudgetScreen() {
         <PixelButton text="+ Planned item" onPress={() => nav.go({ kind: 'planned' })} art="icon_star" style={wrap} />
         <Small>Bought items move to Txns as an expense.</Small>
       </FoldWindow>
+      </Side>
 
       {reserving && <ReserveDialog p={reserving} onDismiss={() => setReserving(null)} />}
     </Page>

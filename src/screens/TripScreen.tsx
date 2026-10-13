@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native'
 import { Glyphs, Px, Type } from '../ui/theme'
 import {
   ArtImg, Body, Chip, Choice, CloseButton, DateField, FoldWindow, KeyValue, Label, Page, PageHeader, PickerBox, PixelButton, PixelDialog,
-  PixelField, PixelProgress, Rule, SearchPicker, Small, Window, Avatar } from '../ui/components'
+  PixelField, PixelProgress, Rule, SearchPicker, Small, Window, Avatar, Side } from '../ui/components'
 import { useNav } from '../ui/nav'
 import { store, useAppState } from '../data/store'
 import { AppState, TRIP_COST_KINDS, Trip, myShare, normTrip, normTripCost, tripTarget } from '../data/state'
@@ -121,6 +121,7 @@ export function TripScreen({ id }: { id: string }) {
       <CostsWindow st={st} t={t} />
       {!started && <SavingWindow key={t.monthly} st={st} t={t} />}
 
+      <Side>
       <Window title={started ? 'Trip fund' : 'Fund so far'}>
         <View style={[row, { gap: 10 }]}>
           <Avatar size={48} />
@@ -142,6 +143,7 @@ export function TripScreen({ id }: { id: string }) {
         {list.map((x) => <TxnRow key={x.id} txn={x} />)}
         <PixelButton text="Trip expense" onPress={() => nav.go({ kind: 'expense', tripId: id })} glyph={Glyphs.plus} />
       </Window>
+      </Side>
       <PixelButton text="Edit trip" onPress={() => setEditing(true)} kind="secondary" />
       <PixelButton text="Delete trip and its expenses" onPress={() => store.update((s) => deleteTrip(s, id))} kind="danger" />
       {editing && <TripDialog st={st} existing={t} onDismiss={() => setEditing(false)} />}

@@ -6,7 +6,7 @@ import { togglePaidBack } from '../data/actions'
 import { currency, liveTxns, periodFromKey, periodOf } from '../data/ledger'
 import { ME, Txn, debtors, isSplit, myShare, personLabel } from '../data/state'
 import { store, useAppState } from '../data/store'
-import { ArtImg, Body, Chip, Choice, FoldWindow, KeyValue, Label, Page, PixelButton, PixelField, Rule, Small, Window } from '../ui/components'
+import { ArtImg, Body, Chip, Choice, FoldWindow, KeyValue, Label, Page, PixelButton, PixelField, Rule, Small, Window, Side } from '../ui/components'
 import { useNav } from '../ui/nav'
 import { Px, Type } from '../ui/theme'
 import { Toggles } from './ExpenseScreen'
@@ -42,12 +42,14 @@ export function TxnsScreen() {
         </View>
         <Small>{p.start} to {addDays(p.end, -1)}</Small>
       </Window>
+      <Side>
       <FoldWindow title={active ? 'Search & filters (on)' : 'Search & filters'}>
         <PixelField value={query} onChange={setQuery} label="" placeholder="Search merchant, item, note" />
         <Choice options={SCOPES} selected={scope} label={(x) => x} onSelect={setScope} />
         <Choice<string | null> options={[null, ...st.categories]} selected={category} label={(c) => c ?? 'Any category'} onSelect={setCategory} />
         {active && <PixelButton text="Clear" kind="secondary" onPress={() => { setQuery(''); setScope('All'); setCategory(null) }} />}
       </FoldWindow>
+      </Side>
       <Window title={`${list.length} items`}>
         {list.length === 0 && <Small>Nothing here.</Small>}
         {list.map((t, i) => (

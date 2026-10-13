@@ -3,7 +3,7 @@ import { ActivityIndicator, Linking, Text, TextInput, View } from 'react-native'
 import { Glyphs, Px, Type } from '../ui/theme'
 import {
   ArtImg, Body, Chip, Choice, CloseButton, FoldWindow, Label, Page, PageHeader, PickerBox, PixelButton, PixelDialog, PixelField, Rule,
-  SearchPicker, Small, Window, frame, shadow, Avatar, avatarFromFile } from '../ui/components'
+  SearchPicker, Small, Window, frame, shadow, Avatar, avatarFromFile, Side } from '../ui/components'
 import { useNav } from '../ui/nav'
 import { store, useAppState } from '../data/store'
 import { AppState, Txn } from '../data/state'
@@ -49,7 +49,7 @@ export function ProfileScreen() {
         <PixelButton text="Google Sheets sync" onPress={() => nav.go({ kind: 'sync' })} kind="secondary" glyph={Glyphs.sync} />
         <PixelButton text="Credits" onPress={() => nav.go({ kind: 'credits' })} kind="secondary" art="icon_heart" />
       </Window>
-      <CategoriesWindow st={st} />
+      <Side><CategoriesWindow st={st} /></Side>
       <Small>Budgeter for the web</Small>
     </Page>
   )
@@ -134,6 +134,7 @@ export function AiScreen() {
         {note && <Body>{note}</Body>}
         {active != null && <PixelButton text="Use built-in reader instead" onPress={() => { Ai.setActive(null); refresh() }} kind="secondary" />}
       </Window>
+      <Side>
       <Window title="Add a login">
         <Choice options={PRESETS.map((p) => p.id)} selected={adding} label={(id) => preset(id).name} onSelect={setAdding} />
         {adding && <>
@@ -146,6 +147,7 @@ export function AiScreen() {
           <ProviderForm key={adding} presetId={adding} existing={null} onSaved={() => { refresh(); setAdding(null) }} />
         </>}
       </Window>
+      </Side>
       {editing && (
         <PixelDialog title={`Edit ${editing.label}`} onDismiss={() => setEditing(null)}>
           <ProviderForm presetId={editing.preset} existing={editing} onSaved={() => { refresh(); setEditing(null) }} />

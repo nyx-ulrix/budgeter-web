@@ -5,7 +5,7 @@ import { buyNow, deletePlanned, savePlanned } from '../data/actions'
 import { currency, periodOf, reserved, snapshot } from '../data/ledger'
 import { normPlanned } from '../data/state'
 import { store, useAppState } from '../data/store'
-import { Body, Choice, KeyValue, Label, Page, PageHeader, PixelButton, PixelField, PixelProgress, Small, Window } from '../ui/components'
+import { Body, Choice, KeyValue, Label, Page, PageHeader, PixelButton, PixelField, PixelProgress, Small, Window, Side } from '../ui/components'
 import { useNav } from '../ui/nav'
 import { Px } from '../ui/theme'
 import { ReserveDialog } from './BudgetScreen'
@@ -61,7 +61,7 @@ export function PlannedScreen({ id }: { id?: string }) {
       {existing != null && existing.status === 'OPEN' && (() => {
         const left = Math.max(existing.price - res, 0)
         const daysLeft = Math.max(daysBetween(todayIso(), snapshot(st).period.end), 1)
-        return <>
+        return <Side>
           <Window title="Progress">
             <PixelProgress fraction={res / existing.price} color={Px.blue} />
             <KeyValue k="Reserved" v={money(res, cur)} />
@@ -75,7 +75,7 @@ export function PlannedScreen({ id }: { id?: string }) {
             <Choice options={st.categories} selected={category} label={(c) => c} onSelect={setCategory} />
             <PixelButton text="Buy now" style={full} onPress={() => { store.update((s) => buyNow(s, existing, category)); nav.reset('txns') }} />
           </Window>
-        </>
+        </Side>
       })()}
 
       {existing != null && (

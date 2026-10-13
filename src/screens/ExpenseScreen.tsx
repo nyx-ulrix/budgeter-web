@@ -12,8 +12,7 @@ import { AppState, ME, Txn, newId, personId, personLabel } from '../data/state'
 import { store, useAppState } from '../data/store'
 import {
   Body, Chip, Choice, CloseButton, DateField, FoldWindow, KeyValue, Label, Page, PageHeader, PixelButton, PixelField, Rule,
-  SearchPicker, Small, Window,
-} from '../ui/components'
+  SearchPicker, Small, Window, Side } from '../ui/components'
 import { Screen, useNav } from '../ui/nav'
 import { Px, Type } from '../ui/theme'
 
@@ -315,6 +314,7 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
           )}
         </Window>
 
+        <Side>
         {st.trips.length > 0 && (
           <Window title="Count toward">
             <Choice<string | null> options={[null, ...trips.map((t) => t.id)]} selected={d.tripId}
@@ -377,6 +377,7 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
             <Small>{s.ocrText}</Small>
           </FoldWindow>
         )}
+        </Side>
 
         {errors.map((e, i) => <Text key={i} style={[Type.small, { color: Px.red }]}>! {e}</Text>)}
         <PixelButton text={existing ? 'Save changes' : 'Save expense'} onPress={save} enabled={errors.length === 0} />

@@ -1,5 +1,5 @@
-import React, { ReactNode, createElement, useRef, useState } from 'react'
-import { Image, Modal, Pressable, ScrollView, Text, TextInput, View, ViewStyle } from 'react-native'
+import React, { ReactNode, createContext, createElement, isValidElement, useContext, useRef, useState } from 'react'
+import { Image, Modal, Pressable, ScrollView, Text, TextInput, View, ViewStyle, useWindowDimensions } from 'react-native'
 import { Art, ArtName, Px, Type } from './theme'
 import { useNav } from './nav'
 import { useAppState } from '../data/store'
@@ -49,7 +49,8 @@ export function Window({ title, header = Px.orange, actions, children, style }: 
 
 /** Window that folds to its title bar. Closed again whenever the screen is left. */
 export function FoldWindow({ title, open = false, children }: { title: string; open?: boolean; children: ReactNode }) {
-  const [isOpen, setOpen] = useState(open)
+  const inSide = useContext(SideOpen)
+  const [isOpen, setOpen] = useState(open || inSide)
   return (
     <View style={[{ width: '100%' }, shadow(), frame()]}>
       <Pressable
@@ -155,8 +156,8 @@ export function PixelSlider({ value, onChange, max, step, color = Px.blue }: { v
 }
 
 /** Square status chip with a symbol + word so state never relies on colour alone. */
-export const Chip = ({ text, color }: { text: string; color: string }) => (
-  <View style={[frame(color, Px.brown, 2), { paddingHorizontal: 6, paddingVertical: 3, alignSelf: 'flex-start' }]}>
+export const Chip = ({ text, color, style }: { text: string; color: string; style?: ViewStyle }) => (
+  <View style={[frame(color, Px.brown, 2), { paddingHorizontal: 6, paddingVertical: 3, alignSelf: 'flex-start' }, style]}>
     <Text style={[Type.label, { color: [Px.cream, Px.creamLight, Px.yellow].includes(color) ? Px.brown : Px.creamLight }]}>{text.toUpperCase()}</Text>
   </View>
 )
@@ -224,12 +225,33 @@ export const Rule = () => (
   </View>
 )
 
-/** Scrolling page body with larger gaps between windows than inside them. */
-export const Page = ({ children }: { children: ReactNode }) => (
-  <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingLeft: 14, paddingRight: 18, paddingTop: 16, paddingBottom: 24, gap: 20, width: '100%', maxWidth: 720, alignSelf: 'center' }}>
-    {children}
-  </ScrollView>
-)
+/** Computers and tablets (900 px and wider) get the side-by-side dashboard layout. */
+export const useWide = () => useWindowDimensions().width >= 900
+
+const SideOpen = createContext(false)
+
+/**
+ * Secondary windows of a page. On a wide screen they move to a column on the right (and folds there start open);
+ * on a phone they stay where they are in the page.
+ */
+export const Side = ({ children }: { children: ReactNode }) => <>{children}</>
+
+/** Scrolling page body with larger gaps between windows than inside them. Splits into two columns on wide screens. */
+export function Page({ children }: { children: ReactNode }) {
+  const wide = useWide()
+  const kids = React.Children.toArray(children)
+  const isSide = (k: unknown) => isValidElement(k) && k.type === Side
+  const pad = { paddingLeft: 14, paddingRight: 18, paddingTop: 16, paddingBottom: 24, width: '100%', alignSelf: 'center' } as const
+  if (!wide || !kids.some(isSide)) {
+    return <ScrollView style={{ flex: 1 }} contentContainerStyle={{ ...pad, gap: 20, maxWidth: wide ? 820 : 720 }}>{children}</ScrollView>
+  }
+  return (
+    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ ...pad, paddingHorizontal: 24, maxWidth: 1320, flexDirection: 'row', alignItems: 'flex-start', gap: 28 }}>
+      <View style={{ flex: 3, minWidth: 0, gap: 20 }}>{kids.filter((k) => !isSide(k))}</View>
+      <View style={{ flex: 2, minWidth: 0, gap: 20 }}><SideOpen.Provider value={true}>{kids.filter(isSide)}</SideOpen.Provider></View>
+    </ScrollView>
+  )
+}
 
 /** Page title row with a back button, for pushed screens. */
 export function PageHeader({ title }: { title: string }) {

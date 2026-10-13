@@ -2,7 +2,7 @@ import React, { useEffect } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { useFonts } from 'expo-font'
 import { Fonts, Glyphs, Px, Type } from './src/ui/theme'
-import { Avatar, Chip, Glyph, Small, Window } from './src/ui/components'
+import { Avatar, Chip, Glyph, Small, Window, useWide } from './src/ui/components'
 import { NavProvider, Tab, useNav } from './src/ui/nav'
 import { ScannerProvider, useScanner } from './src/ocr/scanner'
 import { store, useAppState } from './src/data/store'
@@ -50,13 +50,21 @@ function renewOnTap() {
 function Root() {
   const st = useAppState()
   const nav = useNav()
+  const wide = useWide()
   if (!st.setup) return <View style={{ flex: 1, backgroundColor: Px.cream }}><SetupScreen existing={null} /></View>
   return (
     <ScannerProvider onResult={(receipt, text) => nav.go({ kind: 'expense', receipt, ocrText: text || undefined })}>
       <View style={{ flex: 1, backgroundColor: Px.cream }} {...({ onPointerDown: renewOnTap } as any)}>
         <Toolbar />
-        <View style={{ flex: 1 }}>{screen()}</View>
-        {nav.stack.length === 0 && <BottomBar />}
+        {wide ? (
+          <View style={{ flex: 1, flexDirection: 'row' }}>
+            <SideBar />
+            <View style={{ flex: 1 }}>{screen()}</View>
+          </View>
+        ) : <>
+          <View style={{ flex: 1 }}>{screen()}</View>
+          {nav.stack.length === 0 && <BottomBar />}
+        </>}
         <ScanningOverlay />
       </View>
     </ScannerProvider>
@@ -95,10 +103,10 @@ function Toolbar() {
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Px.orange, minHeight: 48, paddingHorizontal: 10 }}>
         <View style={{ borderWidth: 2, borderColor: Px.creamLight, padding: 2 }}><Avatar size={28} /></View>
         <Text style={[Type.number, { color: Px.creamLight, flex: 1 }]}>BUDGETER</Text>
-        <Chip text={snap.period.key} color={Px.creamLight} />
+        <Chip text={snap.period.key} color={Px.creamLight} style={{ alignSelf: 'center' }} />
         {st.sync.enabled && (
-          <Pressable onPress={() => nav.go({ kind: 'sync' })} role="button" aria-label="Sync settings">
-            <Chip text={paused ? 'Sync paused' : 'Synced'} color={paused ? Px.red : Px.green} />
+          <Pressable onPress={() => nav.go({ kind: 'sync' })} role="button" aria-label="Sync settings" style={{ alignSelf: 'center' }}>
+            <Chip text={paused ? 'Sync paused' : 'Synced'} color={paused ? Px.red : Px.green} style={{ alignSelf: 'center' }} />
           </Pressable>
         )}
       </View>
@@ -124,6 +132,25 @@ function BottomBar() {
           )
         })}
       </View>
+    </View>
+  )
+}
+
+/** Wide screens: the tabs as a sidebar on the left, always there (a tab also closes any open screen). */
+function SideBar() {
+  const nav = useNav()
+  return (
+    <View role="tablist" style={{ width: 200, backgroundColor: Px.cream, borderRightWidth: 3, borderColor: Px.brown, paddingVertical: 12, gap: 6 }}>
+      {TABS.map(({ tab, label, glyph }) => {
+        const on = nav.tab === tab && nav.stack.length === 0
+        return (
+          <Pressable key={tab} role="tab" aria-selected={on} onPress={() => nav.reset(tab)}
+            style={{ flexDirection: 'row', alignItems: 'center', gap: 12, minHeight: 48, paddingHorizontal: 18, backgroundColor: on ? Px.orange : 'transparent' }}>
+            <Glyph rows={glyph} color={on ? Px.creamLight : Px.brown} size={18} />
+            <Text style={[Type.title, { color: on ? Px.creamLight : Px.brown }]}>{label.toUpperCase()}</Text>
+          </Pressable>
+        )
+      })}
     </View>
   )
 }

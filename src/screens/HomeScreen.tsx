@@ -6,7 +6,7 @@ import { activeTrip, currency, dailyImpact, liveTxns, snapshot, Snapshot, tripFu
 import { Planned } from '../data/state'
 import { useAppState } from '../data/store'
 import { useScanner } from '../ocr/scanner'
-import { ArtImg, Body, Chip, FoldWindow, Label, Page, PixelButton, PixelProgress, Small, Window, frame, Avatar } from '../ui/components'
+import { ArtImg, Body, Chip, FoldWindow, Label, Page, PixelButton, PixelProgress, Small, Window, frame, Avatar, Side } from '../ui/components'
 import { MonthBar, Swatch } from '../ui/MonthBar'
 import { useNav } from '../ui/nav'
 import { Glyphs, Px, Type } from '../ui/theme'
@@ -79,7 +79,8 @@ export function HomeScreen() {
         <PixelButton text="Scan" onPress={scanner.camera} glyph={Glyphs.camera} style={{ flex: 1 }} />
       </View>
 
-      {/* Secondary, folded. */}
+      {/* Secondary, folded (a side column on wide screens). */}
+      <Side>
       {trip && (
         <FoldWindow title={`Trip: ${trip.name}`}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -103,6 +104,7 @@ export function HomeScreen() {
       </FoldWindow>
 
       <Small>Savings totals are kept off this screen. See Budget → Savings.</Small>
+      </Side>
 
       {reserving && <ReserveDialog p={reserving} onDismiss={() => setReserving(null)} />}
     </Page>

@@ -248,14 +248,16 @@ function ShareWindow({ cur }: { cur: string }) {
 
 function AddWindow({ cur }: { cur: string }) {
   return (
-    <Section title="One-off top up or expense">
-      <TxForm cur={cur} onSave={addTx} />
+    <Section title="One-off top up">
+      <TxForm cur={cur} kind="topup" onSave={addTx} />
+      <Small>Date spending is added like any expense: pick Date budget under Count toward.</Small>
     </Section>
   )
 }
 
-function TxForm({ cur, tx, onSave, onDone }: { cur: string; tx?: Tx; onSave: (d: Draft) => Promise<void>; onDone?: () => void }) {
-  const [kind, setKind] = useState<Tx['kind']>(tx?.kind ?? 'expense')
+/** Amount, what for and date of a date budget entry. Its kind is fixed: new ones here are top-ups; edits keep theirs. */
+function TxForm({ cur, tx, kind: newKind = 'topup', onSave, onDone }: { cur: string; tx?: Tx; kind?: Tx['kind']; onSave: (d: Draft) => Promise<void>; onDone?: () => void }) {
+  const kind = tx?.kind ?? newKind
   const [amount, setAmount] = useState(tx ? plain(tx.amount, cur) : '')
   const [note, setNote] = useState(tx?.note ?? '')
   const [date, setDate] = useState(tx?.date ?? todayIso())
@@ -264,7 +266,6 @@ function TxForm({ cur, tx, onSave, onDone }: { cur: string; tx?: Tx; onSave: (d:
   const v = parseMoney(amount, cur)
   return (
     <View style={{ gap: 10 }}>
-      <Choice options={['expense', 'topup'] as Tx['kind'][]} selected={kind} label={(k) => (k === 'expense' ? 'Expense' : 'Top up')} onSelect={setKind} />
       <PixelField value={amount} onChange={setAmount} label={`Amount (${cur})`} keyboard="decimal-pad" placeholder="0.00" />
       <PixelField value={note} onChange={(s) => setNote(s.slice(0, 100))} label="What for" placeholder={kind === 'expense' ? 'Dinner, movie…' : 'Top up'} />
       <DateField label="Date" value={date} onChange={setDate} />

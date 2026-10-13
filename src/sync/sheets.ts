@@ -128,7 +128,7 @@ async function pushTxns(token: string, sheetId: string, tabs: Set<string>) {
   }), { notify: false })
 }
 
-async function runOnce(token: string) {
+export async function runOnce(token: string) {
   let sheetId = store.get().sync.spreadsheetId ?? (await findSpreadsheet(token)) ?? (await createSpreadsheet(token))
   const setId = (id: string) => store.update((s) => ({ ...s, sync: { ...s.sync, spreadsheetId: id } }), { notify: false })
   setId(sheetId)

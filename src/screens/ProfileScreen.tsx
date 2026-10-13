@@ -269,6 +269,7 @@ export function SyncScreen() {
         <Body>Keeps everything in a spreadsheet called Budgeter in your Google Drive, with a readable tab for each month.</Body>
         <Small>The Budgeter phone app and this web app share everything through it: a hidden _sync tab carries every change (setup, budgets, expenses, trips, planned purchases) between them, and the month tabs list your expenses. Connect the same Google account in both.</Small>
         <Small>Budgeter can only see files it made itself. Edits typed into the month tabs don't come back to the app.</Small>
+        <Small>Already using Budgeter on your phone? Connect before setting things up here. Newer changes win, so settings entered in this browser first would replace the phone's.</Small>
         {!sync.enabled ? <PixelButton text="Connect Google" onPress={connect} glyph={Glyphs.sync} enabled={busy == null} />
           : sync.paused ? <>
             <Chip text="✖ Sync paused" color={Px.red} />

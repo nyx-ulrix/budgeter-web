@@ -278,12 +278,37 @@ export function Avatar({ size, label }: { size: number; label?: string }) {
   return <Image source={{ uri: photo }} style={{ width: size, height: size }} accessibilityLabel={label ?? 'Profile picture'} />
 }
 
-/** A picked photo as a small square JPEG data URL (centre crop, 128 px): small enough to sync in one sheet cell. */
+/**
+ * A picked picture as a small square data URL. Fully transparent edges are trimmed, then the whole picture is scaled
+ * to fit the square (never cut); any space left over stays transparent. PNG when there's transparency, else JPEG.
+ * It has to fit in one sheet cell to sync (50,000 characters), so a large one shrinks.
+ */
 export async function avatarFromFile(file: File): Promise<string> {
   const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
-  const side = Math.min(bmp.width, bmp.height)
-  const c = document.createElement('canvas')
-  c.width = c.height = 128
-  c.getContext('2d')!.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, 128, 128)
-  return c.toDataURL('image/jpeg', 0.85)
+  // Where the visible part is, measured on a copy at most 512 px wide.
+  const k = Math.min(1, 512 / Math.max(bmp.width, bmp.height))
+  const m = document.createElement('canvas')
+  m.width = Math.max(1, Math.round(bmp.width * k)); m.height = Math.max(1, Math.round(bmp.height * k))
+  const mg = m.getContext('2d')!
+  mg.drawImage(bmp, 0, 0, m.width, m.height)
+  const a = mg.getImageData(0, 0, m.width, m.height).data
+  let x0 = m.width, y0 = m.height, x1 = -1, y1 = -1
+  for (let y = 0; y < m.height; y++) for (let x = 0; x < m.width; x++) if (a[(y * m.width + x) * 4 + 3] > 8) {
+    if (x < x0) x0 = x; if (x > x1) x1 = x; if (y < y0) y0 = y; if (y > y1) y1 = y
+  }
+  if (x1 < 0) { x0 = 0; y0 = 0; x1 = m.width - 1; y1 = m.height - 1 } // all transparent: keep it all
+  const bx = x0 / k, by = y0 / k, bw = (x1 - x0 + 1) / k, bh = (y1 - y0 + 1) / k
+  for (const size of [128, 96, 64]) {
+    const c = document.createElement('canvas')
+    c.width = c.height = size
+    const g = c.getContext('2d')!
+    const sc = size / Math.max(bw, bh), dw = bw * sc, dh = bh * sc
+    g.drawImage(bmp, bx, by, bw, bh, (size - dw) / 2, (size - dh) / 2, dw, dh)
+    const px = g.getImageData(0, 0, size, size).data
+    let clear = false
+    for (let i = 3; i < px.length; i += 4) if (px[i] < 255) { clear = true; break }
+    const url = clear ? c.toDataURL('image/png') : c.toDataURL('image/jpeg', 0.85)
+    if (url.length < 45_000) return url
+  }
+  throw new Error('Picture too detailed to sync.')
 }

@@ -9,7 +9,9 @@ import { budgetRows, Plan, totals, Tx } from './money'
  * few seconds while the screen is open instead of a live listener (no SDK).
  * Layout (see DateBudget's firestore.rules): budgets/{code} {members, names, plan}; budgets/{code}/tx/{id}.
  */
-const KEY = 'AIzaSyDtw62oTaN-IeMc42AEMNEYpg5nUFeHZOM' // DateBudget's public web API key
+// DateBudget's Firebase web key, from .env.local (not committed). It ships in the page like any Firebase web key;
+// it only works from the Budgeter and DateBudget sites and only for sign-in and the database.
+const KEY = process.env.EXPO_PUBLIC_DATEBUDGET_API_KEY ?? ''
 const DOCS = 'https://firestore.googleapis.com/v1/projects/datebudget/databases/(default)/documents'
 const SESSION = 'datebudget-session' // refresh token, encrypted (Secrets)
 

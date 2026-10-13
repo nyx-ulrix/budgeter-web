@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Text, View } from 'react-native'
 import { addDays, daysBetween, nextPeriod, prevPeriod, todayIso } from '../core/budget'
 import { digits, div, money, parseMoney, plain } from '../core/money'
-import { addLine, editPlan, removeLine, setReserved } from '../data/actions'
+import { addLine, editPlan, removeLine, setReserved, isSpentReserve } from '../data/actions'
 import {
   available, currency, monthSaved, periodFromKey, periodOf, planFor, planTotal, reserved, savedToDate, snapshot, spendable, spent,
 } from '../data/ledger'
@@ -38,10 +38,9 @@ export function BudgetScreen() {
   const p = periodFromKey(st, key)
   const plan = planFor(st, key)
   const [reserving, setReserving] = useState<Planned | null>(null)
-  const setAside = plan.lines.filter((l) => l.kind === 'RESERVE' || l.kind === 'TRIP_FUND')
+  const setAside = plan.lines.filter((l) => (l.kind === 'RESERVE' && !isSpentReserve(st, l)) || l.kind === 'TRIP_FUND')
   const open = st.planned.filter((x) => x.status === 'OPEN')
     .sort((a, b) => a.priority - b.priority || (a.targetMonth < b.targetMonth ? -1 : a.targetMonth > b.targetMonth ? 1 : 0))
-  const bought = st.planned.filter((x) => x.status === 'BOUGHT')
   const ended = p.end <= todayIso()
   const wholeBudget = monthSaved(st, key) + spent(st, p) - Math.max(spent(st, p), spendable(st, key))
 
@@ -102,10 +101,7 @@ export function BudgetScreen() {
           </React.Fragment>
         ))}
         <PixelButton text="+ Planned item" onPress={() => nav.go({ kind: 'planned' })} art="icon_star" style={wrap} />
-        {bought.length > 0 && <>
-          <Label>Bought</Label>
-          {bought.map((b) => <KeyValue key={b.id} k={`✓ ${b.name}`} v={money(b.price, cur)} />)}
-        </>}
+        <Small>Bought items move to Txns as an expense.</Small>
       </FoldWindow>
 
       {reserving && <ReserveDialog p={reserving} onDismiss={() => setReserving(null)} />}

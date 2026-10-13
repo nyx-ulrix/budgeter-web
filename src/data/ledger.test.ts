@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { AppState, Loose, ME, Txn, budgetImpact, normLine, normPlan, normPlanned, normSetup, normState, normTrip, normTxn, normTxnItem } from './state'
 import { activeTrip, available, monthSaved, planFor, planSpendable, reserved, savedToDate, snapshot, spendable, tripFund, tripSpent } from './ledger'
-import { withReserved, buyNow, deletePlanned, deleteTxn } from './actions'
+import { withReserved, buyNow, deletePlanned, deleteTxn, isSpentReserve, removeLine } from './actions'
 
 const setup = { country: 'SG', currency: 'SGD', startDay: 1, name: '' }
 const oct5 = '2026-10-05'
@@ -67,12 +67,16 @@ test('editing reserved adds now and releases latest first', () => {
   const bought = buyNow(st, p, 'Shopping', oct5)
   const t = bought.txns[bought.txns.length - 1]
   assert.equal(t.fromReserve, 15_000)
-  assert.equal(bought.planned.length, 0) // p wasn't in the list; status only flips for listed items
+  assert.equal(bought.planned.length, 0)
   const listed = buyNow({ ...st, planned: [p] }, p, 'Shopping', oct5)
-  assert.equal(listed.planned[0].status, 'BOUGHT')
-  assert.equal(deleteTxn(listed, listed.txns[0].id).planned[0].status, 'OPEN')
+  assert.equal(listed.planned.length, 0) // bought items leave the planned list
+  const line = Object.values(listed.plans).flatMap((x) => x.lines).find((l) => l.plannedId === 'p')!
+  assert.ok(isSpentReserve(listed, line))
+  assert.equal(reserved(removeLine(listed, '2026-10', line.id), 'p'), 15_000) // can't take back money the purchase used
+  const undone = deleteTxn(listed, listed.txns[0].id)
+  assert.deepEqual(undone.planned.map((x) => [x.id, x.status]), [['p', 'OPEN']])
+  assert.equal(reserved(undone, 'p'), 15_000)
   assert.equal(reserved(deletePlanned({ ...st, planned: [p] }, 'p'), 'p'), 0)
-  assert.equal(reserved(deletePlanned(listed, 'p'), 'p'), 15_000) // bought keeps its reservations
 })
 
 test('saved up is kept aside plus unspent days', () => {

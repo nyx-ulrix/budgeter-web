@@ -1,6 +1,6 @@
 import { todayIso } from '../core/budget'
 import { periodOf, planFor, reserved, tripMonthly } from './ledger'
-import { AppState, Line, Plan, Planned, Setup, SyncInfo, Trip, TripCost, Txn, normLine, normPlan, normTxn } from './state'
+import { AppState, Line, Plan, Planned, Setup, SyncInfo, Trip, TripCost, Txn, normLine, normPlan, normTxn, normPlanned } from './state'
 
 /** Every state change the UI can make, as pure functions. The store stamps changed records after each one. */
 
@@ -18,7 +18,13 @@ export const editPlan = (s: AppState, key: string, f: (p: Plan) => Plan): AppSta
 /** Adds a line dated today, so it changes spendable money from today on, not for days already past. */
 export const addLine = (s: AppState, key: string, line: Line, today: string = todayIso()): AppState =>
   editPlan(s, key, (p) => ({ ...p, lines: [...p.lines, { ...line, added: line.added ?? today }] }))
-export const removeLine = (s: AppState, key: string, id: string): AppState => editPlan(s, key, (p) => ({ ...p, lines: p.lines.filter((l) => l.id !== id) }))
+/** Removes a line. A reservation already spent by "Buy now" stays: its purchase counts on it. */
+export const removeLine = (s: AppState, key: string, id: string): AppState =>
+  editPlan(s, key, (p) => ({ ...p, lines: p.lines.filter((l) => l.id !== id || isSpentReserve(s, l)) }))
+
+/** A reservation whose item was bought (or is no longer planned): spent, not set aside. */
+export const isSpentReserve = (s: AppState, l: Line): boolean =>
+  l.kind === 'RESERVE' && l.plannedId != null && !s.planned.some((p) => p.id === l.plannedId && p.status === 'OPEN')
 
 export function saveTxn(s: AppState, t: Txn, now: number = Date.now()): AppState {
   const stamped = { ...t, updatedAt: now }
@@ -35,12 +41,19 @@ const notNull = <T>(x: T | null): x is T => x != null
  * Deletes a transaction. Deleting a planned item's "Buy now" expense puts the item back on the list,
  * with its reservations, so that money isn't left neither spent nor free.
  */
+/**
+ * Deletes a transaction. Deleting a "Buy now" expense puts the item back on the planned list, where its
+ * reservations still are, so that money is neither spent nor lost.
+ */
 export function deleteTxn(s: AppState, id: string, now: number = Date.now()): AppState {
-  const plannedId = s.txns.find((t) => t.id === id)?.plannedId
+  const t = s.txns.find((x) => x.id === id)
+  const pid = t?.plannedId
+  const back = t && pid != null && !s.planned.some((p) => p.id === pid)
+    ? [normPlanned({ id: pid, name: t.merchant, price: t.total, targetMonth: periodOf(s, t.date).key })] : []
   return {
     ...s,
-    txns: s.txns.map((t) => (t.id !== id ? t : tombstone(s, t, now))).filter(notNull),
-    planned: s.planned.map((p) => (plannedId != null && p.id === plannedId ? { ...p, status: 'OPEN' } : p)),
+    txns: s.txns.map((x) => (x.id !== id ? x : tombstone(s, x, now))).filter(notNull),
+    planned: [...s.planned.map((p) => (pid != null && p.id === pid ? { ...p, status: 'OPEN' as const } : p)), ...back],
   }
 }
 
@@ -82,7 +95,8 @@ export const setReserved = withReserved
 export function buyNow(s: AppState, p: Planned, category: string, today: string = todayIso()): AppState {
   const st = reserved(s, p.id) > p.price ? withReserved(s, p, p.price, today) : s // free any excess first
   const txn = normTxn({ date: today, total: p.price, category, merchant: p.name, note: 'Planned purchase', plannedId: p.id, fromReserve: reserved(st, p.id) })
-  return { ...st, txns: [...st.txns, txn], planned: st.planned.map((x) => (x.id === p.id ? { ...x, status: 'BOUGHT' } : x)) }
+  // The item leaves the planned list; its reservations become part of the purchase (see isSpentReserve).
+  return { ...st, txns: [...st.txns, txn], planned: st.planned.filter((x) => x.id !== p.id) }
 }
 
 /** Deleting an unbought item releases its reservations; a bought one keeps them (its expense relies on them). */

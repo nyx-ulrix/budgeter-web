@@ -70,10 +70,10 @@ export function PlannedScreen({ id }: { id?: string }) {
             <PixelButton text="Reserve / change amount" onPress={() => setReserving(true)} kind="secondary" style={full} />
           </Window>
           <Window title="Buy now">
-            <Body>Records {money(existing.price, cur)} as spent today. The {money(res, cur)} already reserved isn't counted twice.</Body>
+            <Body>Records {money(existing.price, cur)} as spent today and moves it to Txns. The {money(res, cur)} already reserved isn't counted twice.</Body>
             <Label>Category</Label>
             <Choice options={st.categories} selected={category} label={(c) => c} onSelect={setCategory} />
-            <PixelButton text="Buy now" style={full} onPress={() => { store.update((s) => buyNow(s, existing, category)); nav.back() }} />
+            <PixelButton text="Buy now" style={full} onPress={() => { store.update((s) => buyNow(s, existing, category)); nav.reset('txns') }} />
           </Window>
         </>
       })()}

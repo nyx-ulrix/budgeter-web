@@ -15,7 +15,7 @@ export type Tx = {
 // `day` of the month (1-31, the last day in shorter months); weekly ones land on the Monday.
 // Stored as a list of changes, so periods already gone keep the amount they had.
 export type Every = 'week' | 'fortnight' | 'month'
-export type Step = { from: string; amount: number; every: Every; day?: number } // from = "YYYY-MM-DD"; day only for months
+export type Step = { from: string; amount: number; every: Every; day?: number; split?: Record<string, number> } // from = "YYYY-MM-DD"; day only for months; split = who puts in what (Budgeter only)
 export type Plan = Step[]
 export const EVERY: Record<Every, string> = { week: 'week', fortnight: '2 weeks', month: 'month' }
 

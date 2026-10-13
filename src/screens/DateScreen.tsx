@@ -67,6 +67,14 @@ export function DateBudgetFold({ period }: { period: Period }) {
   const ds = useDate()
   const cur = currency(st)
   useDateRefresh()
+  useEffect(() => {
+    if (ds.phase !== 'ready' || !ds.uid) return
+    const partner = ds.budget!.members.find((m) => m !== ds.uid)
+    const { step, mine } = contributions(ds.budget!.plan, ds.uid, partner)
+    if (!(step as any)?.split) return // no agreed split yet: leave my set-aside alone
+    const want = monthly(mine, step!.every)
+    if ((dateLine(store.get())?.amount ?? 0) !== want) setMyShare(want)
+  }, [ds.budget])
   return (
     <FoldWindow title={ds.phase === 'ready' ? `Date budget · ${money(leftBy(ds.all, period), cur)} left` : 'Date budget'}>
       {ds.error && <Small color={Px.red}>! {ds.error}</Small>}
@@ -172,44 +180,68 @@ function Fund({ cur, period }: { cur: string; period: Period }) {
   )
 }
 
+/** Who puts in what: the current step's split (keys are uids; "partner" until the partner has joined). */
+export function contributions(plan: unknown, uid: string, partnerUid: string | undefined) {
+  const step = currentStep(plan, todayIso())
+  const split: Record<string, number> = (step as any)?.split ?? {}
+  const amount = step?.amount ?? 0
+  const mine = Number.isSafeInteger(split[uid]) ? split[uid] : Math.ceil(amount / 2)
+  const theirs = Number.isSafeInteger(split[partnerUid ?? '']) ? split[partnerUid!] : Number.isSafeInteger(split.partner) ? split.partner : amount - mine
+  return { step, mine, theirs }
+}
+
+/**
+ * The recurring budget for both of you: each person's contribution, added together every week, 2 weeks or month.
+ * The split rides along on the plan step (DateBudget ignores it), and my part becomes my monthly set-aside.
+ */
 function PlanWindow({ cur }: { cur: string }) {
   const ds = useDate()
-  const step = currentStep(ds.budget!.plan, todayIso())
-  const [amount, setAmount] = useState(step ? plain(step.amount, cur) : '')
+  const b = ds.budget!
+  const partner = b.members.find((m) => m !== ds.uid)
+  const partnerName = partner ? b.names[partner] ?? 'Your partner' : 'Your partner'
+  const { step, mine: m0, theirs: t0 } = contributions(b.plan, ds.uid!, partner)
+  const [mine, setMine] = useState(step ? plain(m0, cur) : '')
+  const [theirs, setTheirs] = useState(step ? plain(t0, cur) : '')
   const [every, setEvery] = useState<Every>(step?.every ?? 'month')
   const [day, setDay] = useState(String(step?.day ?? 1))
   const [err, setErr] = useState<string | null>(null)
-  const v = amount.trim() ? parseMoney(amount, cur) : 0
+  const mv = mine.trim() ? parseMoney(mine, cur) : 0
+  const tv = theirs.trim() ? parseMoney(theirs, cur) : 0
   const d = Number(day)
-  const ok = v != null && v >= 0 && (every !== 'month' || (Number.isInteger(d) && d >= 1 && d <= 31))
+  const ok = mv != null && tv != null && mv >= 0 && tv >= 0 && (every !== 'month' || (Number.isInteger(d) && d >= 1 && d <= 31))
+  const total = (mv ?? 0) + (tv ?? 0)
+  const per = `every ${EVERY[every]}`
   return (
-    <Section title="Budget">
-      <Small>{step && step.amount > 0 ? `${money(step.amount, cur)} is added every ${EVERY[step.every]}${step.every === 'month' ? ` on day ${step.day ?? 1}` : ' (on Monday)'}.` : 'No recurring budget yet.'}</Small>
-      <PixelField value={amount} onChange={setAmount} label={`Add (${cur})`} keyboard="decimal-pad" placeholder="0.00" error={v == null ? 'Not a number' : null} />
+    <Section title="Budget for both of you">
+      <Small>{step && step.amount > 0
+        ? `${money(step.amount, cur)} is added every ${EVERY[step.every]}${step.every === 'month' ? ` on day ${step.day ?? 1}` : ' (on Monday)'}: you ${money(m0, cur)}, ${partnerName} ${money(t0, cur)}.`
+        : 'No recurring budget yet.'}</Small>
+      <PixelField value={mine} onChange={setMine} label={`You put in (${cur})`} keyboard="decimal-pad" placeholder="0.00" error={mv == null ? 'Not a number' : null} />
+      <PixelField value={theirs} onChange={setTheirs} label={`${partnerName} puts in (${cur})`} keyboard="decimal-pad" placeholder="0.00" error={tv == null ? 'Not a number' : null} />
       <Choice options={['week', 'fortnight', 'month'] as Every[]} selected={every} label={(e) => `Every ${EVERY[e]}`} onSelect={setEvery} />
       {every === 'month' && <PixelField value={day} onChange={(s) => setDay(s.replace(/\D/g, '').slice(0, 2))} label="On day (1-31)" keyboard="number-pad" />}
-      <PixelButton text="Save" enabled={ok} onPress={() => { setErr(null); setPlan(withBudget(ds.budget!.plan, todayIso(), v!, every, every === 'month' ? d : 1)).catch((e) => setErr(e.message)) }} />
-      <Small>Starts with the current period; earlier ones keep what they had. Set it to 0 to stop. For one-off extras, add a top-up.</Small>
+      <KeyValue k={`Total ${per}`} v={money(total, cur)} />
+      <PixelButton text="Save" enabled={ok} onPress={() => {
+        setErr(null)
+        const plan = withBudget(b.plan, todayIso(), total, every, every === 'month' ? d : 1)
+        const last = plan[plan.length - 1] as any
+        last.split = { [ds.uid!]: mv!, [partner ?? 'partner']: tv! }
+        setPlan(plan).then(() => setMyShare(monthly(mv!, every))).catch((e) => setErr(e.message))
+      }} />
+      <Small>Starts with the current period; earlier ones keep what they had. Set both to 0 to stop. For one-off extras, add a top-up.</Small>
       {err && <Small color={Px.red}>! {err}</Small>}
     </Section>
   )
 }
 
+/** My contribution, set aside from my own budget every month (a fixed cost that follows the split). */
 function ShareWindow({ cur }: { cur: string }) {
   const st = useAppState()
-  const ds = useDate()
-  const step = currentStep(ds.budget!.plan, todayIso())
   const line = dateLine(st)
-  const suggested = step ? Math.round(monthly(step.amount, step.every) / 2) : 0
-  const [text, setText] = useState(line ? plain(line.amount, cur) : suggested ? plain(suggested, cur) : '')
-  const v = text.trim() ? parseMoney(text, cur) : 0
   return (
-    <Section title="My share">
-      <Body>{line ? `${money(line.amount, cur)} a month is set aside from your budget for dates.` : 'Set aside your share each month from your own budget.'}</Body>
-      <PixelField value={text} onChange={setText} label={`Each month (${cur})`} keyboard="decimal-pad" placeholder="0.00" error={v == null ? 'Not a number' : null} />
-      {suggested > 0 && <Small>Half of the shared budget is about {money(suggested, cur)} a month.</Small>}
-      <PixelButton text="Set" kind="secondary" enabled={v != null && v !== (line?.amount ?? 0)} onPress={() => setMyShare(v!)} />
-      <Small>It's a fixed cost in your budget from this month on, so your daily budget already allows for it. Date spending then comes out of the shared fund only: add an expense as usual and pick Date budget under Count toward.</Small>
+    <Section title="From your budget">
+      <Body>{line ? `${money(line.amount, cur)} a month is set aside from your budget for dates.` : 'Nothing is set aside from your budget yet. Save your contribution above.'}</Body>
+      <Small>It follows what you put in (weekly and 2-weekly amounts are turned into a monthly figure). It's a fixed cost from this month on, so your daily budget already allows for it. Date spending then comes out of the shared fund only: add an expense as usual and pick Date budget under Count toward.</Small>
     </Section>
   )
 }

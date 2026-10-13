@@ -15,7 +15,9 @@ export const editSetup = (s: AppState, setup: Setup): AppState => ({ ...s, setup
 /** Edits the plan for [key], materialising the inherited plan first. */
 export const editPlan = (s: AppState, key: string, f: (p: Plan) => Plan): AppState => ({ ...s, plans: { ...s.plans, [key]: f(planFor(s, key)) } })
 
-export const addLine = (s: AppState, key: string, line: Line): AppState => editPlan(s, key, (p) => ({ ...p, lines: [...p.lines, line] }))
+/** Adds a line dated today, so it changes spendable money from today on, not for days already past. */
+export const addLine = (s: AppState, key: string, line: Line, today: string = todayIso()): AppState =>
+  editPlan(s, key, (p) => ({ ...p, lines: [...p.lines, { ...line, added: line.added ?? today }] }))
 export const removeLine = (s: AppState, key: string, id: string): AppState => editPlan(s, key, (p) => ({ ...p, lines: p.lines.filter((l) => l.id !== id) }))
 
 export function saveTxn(s: AppState, t: Txn, now: number = Date.now()): AppState {
@@ -56,7 +58,7 @@ export function withReserved(s: AppState, p: Planned, total: number, today: stri
   if (delta > 0) {
     const key = periodOf(s, today).key
     const plan = planFor(s, key)
-    const line = normLine({ kind: 'RESERVE', name: p.name, amount: delta, plannedId: p.id })
+    const line = normLine({ kind: 'RESERVE', name: p.name, amount: delta, plannedId: p.id, added: today })
     return { ...s, plans: { ...s.plans, [key]: { ...plan, lines: [...plan.lines, line] } } }
   }
   let cut = -delta

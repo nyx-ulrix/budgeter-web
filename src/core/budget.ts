@@ -82,20 +82,27 @@ const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), h
  * over the days left, so an unused day keeps later budgets steady and its leftover shows as the [Day.bonus].
  * Overspending and monthly-category spending use up the leftovers first, then lower every remaining day.
  * Leftovers never cross the period end; month-end leftovers become savings.
- * ponytail: replays from today's [spendable], so changing the budget mid-month re-scores earlier days; store spendable per day if that matters.
+ * [earlier] is spendable money as each earlier day saw it (lines are dated), so reserving or adding money today
+ * changes today and later, not days already past. Missing entries count as [spendable].
+ * ponytail: budget, income and target edits aren't dated, so changing those mid-month still re-scores earlier days.
  */
-export function today(spendable: number, before: DaySpend[], spentToday: number, monthlyToday: number, date: string, p: Period): Day {
-  let pool = Math.max(spendable, 0) // month's money not yet spent
-  let bonus = 0 // of which: earlier days' leftovers
+export function today(spendable: number, before: DaySpend[], spentToday: number, monthlyToday: number, date: string, p: Period, earlier: number[] = []): Day {
+  let spent = 0 // spent so far this period
+  let bonus = 0 // earlier days' leftovers
   let d = p.start
-  for (const s of before) {
-    const budget = div(Math.max(pool - bonus, 0), Math.max(daysBetween(d, p.end), 1))
-    pool = Math.max(pool - s.daily - s.monthly, 0)
-    bonus = clamp(bonus + budget - s.daily - s.monthly, 0, pool)
+  const pool = (s: number) => Math.max(s - spent, 0)
+  before.forEach((s, i) => {
+    const avail = pool(earlier[i] ?? spendable)
+    bonus = Math.min(bonus, avail)
+    const budget = div(avail - bonus, Math.max(daysBetween(d, p.end), 1))
+    spent += s.daily + s.monthly
+    bonus = clamp(bonus + budget - s.daily - s.monthly, 0, Math.max(avail - s.daily - s.monthly, 0))
     d = addDays(d, 1)
-  }
-  const budget = div(Math.max(pool - bonus, 0), Math.max(daysBetween(date, p.end), 1))
-  return makeDay(budget, spentToday, clamp(bonus - monthlyToday, 0, pool))
+  })
+  const avail = pool(spendable)
+  bonus = Math.min(bonus, avail)
+  const budget = div(avail - bonus, Math.max(daysBetween(date, p.end), 1))
+  return makeDay(budget, spentToday, clamp(bonus - monthlyToday, 0, avail))
 }
 
 /** Spending speed against an even pace through the month. Being over the whole budget is separate (Snapshot.over). */

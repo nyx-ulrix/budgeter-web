@@ -27,7 +27,7 @@ export function planFor(s: AppState, key: string): Plan {
   const prev = Object.keys(s.plans).filter((k) => k < key).sort().pop()
   if (prev == null) return normPlan()
   const p = s.plans[prev]
-  return { income: p.income, lines: p.lines.filter((l) => l.kind === 'FIXED' || l.kind === 'SAVINGS'), caps: p.caps, budget: p.budget, savingsTarget: p.savingsTarget }
+  return { income: p.income, lines: p.lines.filter((l) => l.kind === 'FIXED' || l.kind === 'SAVINGS').map((l) => ({ ...l, added: undefined })), caps: p.caps, budget: p.budget, savingsTarget: p.savingsTarget }
 }
 
 /**
@@ -59,9 +59,11 @@ export const available = (s: AppState, key: string): number => planSpendable(pla
  * What I can spend this month: my chosen monthly budget less what I reserve for planned purchases this month
  * (or everything available if I haven't set one), minus the savings target, which is taken off straight away.
  */
-export function spendable(s: AppState, key: string): number {
-  const p = planFor(s, key)
-  return (p.budget != null ? p.budget - planTotal(p, 'RESERVE') : available(s, key)) - p.savingsTarget
+/** [asOf]: spendable money as that day saw it, counting only lines added by then. */
+export function spendable(s: AppState, key: string, asOf?: string): number {
+  const all = planFor(s, key)
+  const p = asOf == null ? all : { ...all, lines: all.lines.filter((l) => l.added == null || l.added <= asOf) }
+  return (p.budget != null ? p.budget - planTotal(p, 'RESERVE') : planSpendable(p) - tripMonthlyTotal(s, key)) - p.savingsTarget
 }
 
 const inBudget = (t: Txn, p: Period) => !t.deleted && t.tripId == null && inPeriod(p, t.date)
@@ -141,7 +143,7 @@ export function snapshot(s: AppState, date: string = todayIso()): Snapshot {
   const total = sum(inP.map(budgetImpact))
   const plan = planFor(s, p.key)
   return makeSnapshot({
-    period: p, spendable: sp, spent: total, day: today(sp, before, now.daily, now.monthly, date, p), pace: pace(sp, total, date, p),
+    period: p, spendable: sp, spent: total, day: today(sp, before, now.daily, now.monthly, date, p, before.map((_, i) => spendable(s, p.key, addDays(p.start, i)))), pace: pace(sp, total, date, p),
     fixed: planTotal(plan, 'FIXED'), categories: byCategory(s, p), target: plan.savingsTarget, saving: planTotal(plan, 'SAVINGS'),
   })
 }

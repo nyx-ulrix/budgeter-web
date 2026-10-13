@@ -66,6 +66,7 @@ export interface Line {
   amount: number
   plannedId?: string
   tripId?: string
+  added?: string // ISO day it was added; undefined = from the period's first day (carried over, or older data)
 }
 
 export interface TxnItem {
@@ -185,7 +186,7 @@ export const normSetup = (o: Loose<Setup>): Setup => ({
 
 export const normLine = (o: Loose<Line>): Line => ({
   id: o.id ?? newId(), kind: o.kind ?? 'EXTRA', name: o.name ?? '', amount: o.amount ?? 0,
-  plannedId: opt(o.plannedId), tripId: opt(o.tripId),
+  plannedId: opt(o.plannedId), tripId: opt(o.tripId), added: opt(o.added),
 })
 
 export const normPlan = (o: Loose<Plan> = {}): Plan => ({

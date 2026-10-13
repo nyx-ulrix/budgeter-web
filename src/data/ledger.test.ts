@@ -1,7 +1,7 @@
 /// <reference types="node" />
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { AppState, Loose, ME, Txn, budgetImpact, normLine, normPlan, normState, normTrip, normTxn, normTxnItem } from './state'
+import { AppState, Loose, ME, Txn, budgetImpact, normLine, normPlan, normPlanned, normSetup, normState, normTrip, normTxn, normTxnItem } from './state'
 import { activeTrip, available, monthSaved, planFor, planSpendable, reserved, savedToDate, snapshot, spendable, tripFund, tripSpent } from './ledger'
 import { withReserved, buyNow, deletePlanned, deleteTxn } from './actions'
 
@@ -155,3 +155,15 @@ test('savings target comes off first and buffers overspend', () => {
   const noBudget = state({ plans: { '2026-10': normPlan({ income: 300_000, savingsTarget: 50_000 }) } })
   assert.equal(spendable(noBudget, '2026-10'), 250_000) // everything available − target
 })
+
+test('reserving today leaves earlier days alone', () => {
+  const base = normState({ setup: normSetup({ country: 'SG', currency: 'SGD', startDay: 1 }), plans: { '2026-10': normPlan({ income: 310_000 }) } })
+  assert.equal(snapshot(base, '2026-10-05').day.bonus, 40_000)
+  const p = normPlanned({ id: 'p', name: 'Phone', price: 81_000, targetMonth: '2026-12' })
+  const day = snapshot(withReserved(base, p, 27_000, '2026-10-05'), '2026-10-05').day
+  assert.equal(day.bonus, 40_000)
+  assert.equal(day.budget, 10_000 - 1_000)
+  const sep = normState({ plans: { '2026-09': normPlan({ income: 1, lines: [normLine({ kind: 'FIXED', name: 'Rent', amount: 1, added: '2026-09-20' })] }) } })
+  assert.equal(planFor(sep, '2026-10').lines[0].added, undefined)
+})
+

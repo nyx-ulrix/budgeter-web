@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "BudgeterWeb",
-    "slug": "BudgeterWeb",
+    "name": "Budgeter",
+    "slug": "budgeter-web",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -19,7 +19,16 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/art/mascot_idle.png",
+      "name": "Budgeter",
+      "shortName": "Budgeter",
+      "description": "Pixel-art budget planner. Shares data with the Budgeter Android app through Google Sheets.",
+      "themeColor": "#F4512A",
+      "backgroundColor": "#E7D6AD",
+      "output": "single"
+    },
+    "plugins": [
+      "expo-font"
+    ]
   }
 }

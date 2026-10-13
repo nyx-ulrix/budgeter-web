@@ -13,6 +13,7 @@ import { Glyphs, Px, Type } from '../ui/theme'
 import { PlannedRow, ReserveDialog } from './BudgetScreen'
 import { TxnRow } from './TxnsScreen'
 import { useDate } from '../date/client'
+import { monthLeft } from './DateScreen'
 
 export const paceColor = (p: Pace): string => (p === 'ON_TRACK' ? Px.green : p === 'SLIGHTLY_OVER' ? Px.orange : Px.red)
 
@@ -74,7 +75,7 @@ export function HomeScreen() {
             : snap.dipping ? `${money(snap.dipped, cur)} of your ${money(snap.target, cur)} savings target spent`
               : `${money(snap.left, cur)} left` + (snap.target > 0 ? ` · ${money(snap.target, cur)} kept for savings` : '')
         ) + ` · ${daysLeft} days to go · resets ${snap.period.end}`}</Small>
-        {ds.phase === 'ready' && <Small>{`Date fund: ${money(ds.left, cur)} left (shared, outside this budget)`}</Small>}
+        {ds.phase === 'ready' && <Small>{`Date fund: ${money(monthLeft(ds.all, snap.period), cur)} left this month (shared, outside this budget)`}</Small>}
       </Window>
 
       <View style={{ flexDirection: 'row', gap: 10 }}>

@@ -76,7 +76,7 @@ export function DateBudgetFold({ period }: { period: Period }) {
     if ((dateLine(store.get())?.amount ?? 0) !== want) setMyShare(want)
   }, [ds.budget])
   return (
-    <FoldWindow title={ds.phase === 'ready' ? `Date budget · ${money(leftBy(ds.all, period), cur)} left` : 'Date budget'}>
+    <FoldWindow title={ds.phase === 'ready' ? `Date budget · ${money(monthLeft(ds.all, period), cur)} left` : 'Date budget'}>
       {ds.error && <Small color={Px.red}>! {ds.error}</Small>}
       {ds.phase === 'signedOut' && <SignIn />}
       {ds.phase === 'loading' && <ActivityIndicator color={Px.orange} />}
@@ -148,21 +148,21 @@ function Connect() {
 }
 
 /** What's left in the shared fund at the end of [p] (today, for the month we're in): everything up to then carries over. */
-const leftBy = (all: Tx[], p: Period) => totals(all.filter((t) => t.date < p.end)).left
+/** Each month stands alone: what was added in [p] minus what was spent in it. Nothing carries over between months. */
+export const monthLeft = (all: Tx[], p: Period) => totals(all.filter((t) => inPeriod(p, t.date))).left
 
-/** The fund for the month picked in the Budget tab: that month's top-ups and spending, and what carries over. */
+/** The fund for the month picked in the Budget tab: that month's top-ups and spending. Months don't carry over. */
 function Fund({ cur, period }: { cur: string; period: Period }) {
   const ds = useDate()
   const b = ds.budget!
   const partner = b.members.find((m) => m !== ds.uid)
   const [copied, setCopied] = useState(false)
   const month = totals(ds.all.filter((t) => inPeriod(period, t.date)))
-  const left = leftBy(ds.all, period)
+  const left = month.left
   return (
     <Section title="Shared fund">
-      <Label>{period.end > todayIso() ? 'Left to spend' : `Left at the end of ${period.key}`}</Label>
+      <Label>{period.end > todayIso() ? 'Left to spend this month' : `Left in ${period.key}`}</Label>
       <Text style={[Type.hero, { color: left < 0 ? Px.red : Px.brown }]}>{money(left, cur)}</Text>
-      <KeyValue k={`Carried over into ${period.key}`} v={money(leftBy(ds.all, { ...period, end: period.start }), cur)} />
       <KeyValue k={`Added in ${period.key}`} v={money(month.topped, cur)} />
       <KeyValue k={`Spent in ${period.key}`} v={money(month.spent, cur)} />
       <Rule />

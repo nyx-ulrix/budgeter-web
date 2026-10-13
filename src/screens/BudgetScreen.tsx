@@ -13,6 +13,7 @@ import {
 import { useNav } from '../ui/nav'
 import { Px, Type } from '../ui/theme'
 import { TripsWindow } from './TripScreen'
+import { DateBudgetFold } from './DateScreen'
 
 /** Compose's remember(keys) { init }: state that resets to [init] whenever any of [deps] changes. */
 function useKeyed<T>(init: () => T, deps: unknown[]): [T, (v: T) => void] {
@@ -95,6 +96,7 @@ export function BudgetScreen() {
       )}
 
       <TripsWindow />
+      <DateBudgetFold period={p} />
 
       <FoldWindow title="Planned purchases">
         {open.length === 0 && <Small>Add things you want to buy later. Reserve money bit by bit, or buy now.</Small>}

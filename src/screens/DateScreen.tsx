@@ -1,16 +1,16 @@
 import React, { createElement, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { Glyphs, Px, Type } from '../ui/theme'
-import { Body, Choice, DateField, KeyValue, Label, Page, PageHeader, PixelButton, PixelDialog, PixelField, Rule, Side, Small, Window } from '../ui/components'
+import { Body, Chip, Choice, DateField, FoldWindow, KeyValue, Label, PixelButton, PixelDialog, PixelField, Rule, Small } from '../ui/components'
 import { store, useAppState } from '../data/store'
 import { AppState, Line, newId } from '../data/state'
 import { currency, periodOf, planFor } from '../data/ledger'
 import { editPlan } from '../data/actions'
 import { money, parseMoney, plain } from '../core/money'
-import { todayIso } from '../core/budget'
+import { inPeriod, Period, todayIso } from '../core/budget'
 import { CLIENT_ID, loadGis } from '../sync/google'
 import { addTx, create, deleteTx, Draft, join, refresh, setPlan, signIn, signOut, updateTx, useDate } from '../date/client'
-import { currentStep, EVERY, Every, Tx, withBudget } from '../date/money'
+import { currentStep, EVERY, Every, totals, Tx, withBudget } from '../date/money'
 
 declare const google: any
 
@@ -44,44 +44,81 @@ function GoogleButton({ onToken }: { onToken: (idToken: string) => void }) {
   return <View style={{ gap: 6 }}>{createElement('div', { ref: box, style: { minHeight: 44 } })}{err && <Small color={Px.red}>! {err}</Small>}</View>
 }
 
-export function DateScreen() {
+/** Keeps the shared budget fresh while a screen showing it is open: your partner's changes show within seconds. */
+export function useDateRefresh() {
+  useEffect(() => {
+    refresh()
+    const t = setInterval(() => { if (!document.hidden) refresh() }, 10_000)
+    return () => clearInterval(t)
+  }, [])
+}
+
+/** A titled part of the Date budget dropdown. */
+const Section = ({ title, children }: { title: string; children: React.ReactNode }) => (
+  <View style={{ gap: 10 }}><Rule /><Label>{title}</Label>{children}</View>
+)
+
+/**
+ * Budget tab: everything to set up the shared date budget (same data as the DateBudget app). Its expenses and top-ups
+ * are in Txns with everything else; date expenses are added like any expense, with Count toward → Date budget.
+ */
+export function DateBudgetFold({ period }: { period: Period }) {
   const st = useAppState()
   const ds = useDate()
   const cur = currency(st)
-  useEffect(() => {
-    refresh()
-    const t = setInterval(() => { if (!document.hidden) refresh() }, 10_000) // the partner's changes show within seconds
-    return () => clearInterval(t)
-  }, [])
-
+  useDateRefresh()
   return (
-    <Page>
-      <PageHeader title="Date budget" />
+    <FoldWindow title={ds.phase === 'ready' ? `Date budget · ${money(leftBy(ds.all, period), cur)} left` : 'Date budget'}>
       {ds.error && <Small color={Px.red}>! {ds.error}</Small>}
       {ds.phase === 'signedOut' && <SignIn />}
       {ds.phase === 'loading' && <ActivityIndicator color={Px.orange} />}
       {ds.phase === 'noBudget' && <Connect />}
       {ds.phase === 'ready' && <>
-        <Fund cur={cur} />
+        <Fund cur={cur} period={period} />
         <PlanWindow cur={cur} />
         <ShareWindow cur={cur} />
-        <Side>
-          <AddWindow cur={cur} />
-          <History cur={cur} />
-        </Side>
+        <AddWindow cur={cur} />
       </>}
-      {ds.phase !== 'signedOut' && <PixelButton text="Sign out of the date budget" kind="secondary" onPress={signOut} />}
-    </Page>
+      {ds.phase !== 'signedOut' && ds.phase !== 'loading' && <PixelButton text="Sign out of the date budget" kind="secondary" onPress={signOut} />}
+    </FoldWindow>
+  )
+}
+
+/** A date budget entry in the Txns list. Tap to edit or delete; it's paid from the shared fund, not my budget. */
+export function DateTxnRow({ tx }: { tx: Tx }) {
+  const st = useAppState()
+  const ds = useDate()
+  const cur = currency(st)
+  const [editing, setEditing] = useState(false)
+  return (
+    <>
+      <Pressable role="button" onPress={() => setEditing(true)} style={{ gap: 4 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Body style={{ flex: 1 }}>{tx.note || (tx.kind === 'expense' ? 'Date' : 'Top up')}</Body>
+          <Text style={[Type.body, { color: tx.kind === 'expense' ? Px.brown : Px.green }]}>{(tx.kind === 'expense' ? '' : '+') + money(tx.amount, cur)}</Text>
+        </View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Chip text="Date budget" color={Px.blue} />
+          <Small>{`${tx.kind === 'expense' ? 'Shared fund' : 'Added to the shared fund'} · ${ds.budget?.names[tx.by] ?? 'Partner'}`}</Small>
+        </View>
+      </Pressable>
+      {editing && (
+        <PixelDialog title="Date budget" onDismiss={() => setEditing(false)}>
+          <TxForm cur={cur} tx={tx} onSave={(d) => updateTx(tx.id, d)} onDone={() => setEditing(false)} />
+          <PixelButton text="Delete" kind="danger" onPress={() => { deleteTx(tx.id); setEditing(false) }} />
+        </PixelDialog>
+      )}
+    </>
   )
 }
 
 function SignIn() {
   return (
-    <Window title="Date budget">
+    <Section title="Sign in">
       <Body>One shared fund for your dates, with your partner. It's the same budget as the DateBudget app, so either of you can use either app.</Body>
       <Small>Sign in with the Google account you use for DateBudget.</Small>
       <GoogleButton onToken={signIn} />
-    </Window>
+    </Section>
   )
 }
 
@@ -90,29 +127,36 @@ function Connect() {
   const [err, setErr] = useState<string | null>(null)
   const run = (f: () => Promise<void>) => { setErr(null); f().catch((e) => setErr(e.message)) }
   return <>
-    <Window title="Start a budget">
+    <Section title="Start a budget">
       <Small>You'll get a code to give your partner.</Small>
       <PixelButton text="Start a budget" onPress={() => run(create)} />
-    </Window>
-    <Window title="Join your partner">
+    </Section>
+    <Section title="Join your partner">
       <PixelField value={code} onChange={(s) => setCode(s.toUpperCase().slice(0, 8))} label="Code" placeholder="ABCD2345" />
       <PixelButton text="Join" enabled={code.trim().length === 8} onPress={() => run(() => join(code))} />
       {err && <Small color={Px.red}>! {err}</Small>}
-    </Window>
+    </Section>
   </>
 }
 
-function Fund({ cur }: { cur: string }) {
+/** What's left in the shared fund at the end of [p] (today, for the month we're in): everything up to then carries over. */
+const leftBy = (all: Tx[], p: Period) => totals(all.filter((t) => t.date < p.end)).left
+
+/** The fund for the month picked in the Budget tab: that month's top-ups and spending, and what carries over. */
+function Fund({ cur, period }: { cur: string; period: Period }) {
   const ds = useDate()
   const b = ds.budget!
   const partner = b.members.find((m) => m !== ds.uid)
   const [copied, setCopied] = useState(false)
+  const month = totals(ds.all.filter((t) => inPeriod(period, t.date)))
+  const left = leftBy(ds.all, period)
   return (
-    <Window title="Date fund.exe">
-      <Label>Left to spend</Label>
-      <Text style={[Type.hero, { color: ds.left < 0 ? Px.red : Px.brown }]}>{money(ds.left, cur)}</Text>
-      <KeyValue k="Added" v={money(ds.topped, cur)} />
-      <KeyValue k="Spent" v={money(ds.spent, cur)} />
+    <Section title="Shared fund">
+      <Label>{period.end > todayIso() ? 'Left to spend' : `Left at the end of ${period.key}`}</Label>
+      <Text style={[Type.hero, { color: left < 0 ? Px.red : Px.brown }]}>{money(left, cur)}</Text>
+      <KeyValue k={`Carried over into ${period.key}`} v={money(leftBy(ds.all, { ...period, end: period.start }), cur)} />
+      <KeyValue k={`Added in ${period.key}`} v={money(month.topped, cur)} />
+      <KeyValue k={`Spent in ${period.key}`} v={money(month.spent, cur)} />
       <Rule />
       {partner
         ? <Small>Shared with {b.names[partner] ?? 'your partner'}.</Small>
@@ -124,7 +168,7 @@ function Fund({ cur }: { cur: string }) {
           </View>
         </>}
       {cur !== 'SGD' && <Small color={Px.red}>DateBudget counts in SGD; amounts here are shown in {cur} without converting.</Small>}
-    </Window>
+    </Section>
   )
 }
 
@@ -139,7 +183,7 @@ function PlanWindow({ cur }: { cur: string }) {
   const d = Number(day)
   const ok = v != null && v >= 0 && (every !== 'month' || (Number.isInteger(d) && d >= 1 && d <= 31))
   return (
-    <Window title="Budget">
+    <Section title="Budget">
       <Small>{step && step.amount > 0 ? `${money(step.amount, cur)} is added every ${EVERY[step.every]}${step.every === 'month' ? ` on day ${step.day ?? 1}` : ' (on Monday)'}.` : 'No recurring budget yet.'}</Small>
       <PixelField value={amount} onChange={setAmount} label={`Add (${cur})`} keyboard="decimal-pad" placeholder="0.00" error={v == null ? 'Not a number' : null} />
       <Choice options={['week', 'fortnight', 'month'] as Every[]} selected={every} label={(e) => `Every ${EVERY[e]}`} onSelect={setEvery} />
@@ -147,7 +191,7 @@ function PlanWindow({ cur }: { cur: string }) {
       <PixelButton text="Save" enabled={ok} onPress={() => { setErr(null); setPlan(withBudget(ds.budget!.plan, todayIso(), v!, every, every === 'month' ? d : 1)).catch((e) => setErr(e.message)) }} />
       <Small>Starts with the current period; earlier ones keep what they had. Set it to 0 to stop. For one-off extras, add a top-up.</Small>
       {err && <Small color={Px.red}>! {err}</Small>}
-    </Window>
+    </Section>
   )
 }
 
@@ -160,21 +204,21 @@ function ShareWindow({ cur }: { cur: string }) {
   const [text, setText] = useState(line ? plain(line.amount, cur) : suggested ? plain(suggested, cur) : '')
   const v = text.trim() ? parseMoney(text, cur) : 0
   return (
-    <Window title="My share">
+    <Section title="My share">
       <Body>{line ? `${money(line.amount, cur)} a month is set aside from your budget for dates.` : 'Set aside your share each month from your own budget.'}</Body>
       <PixelField value={text} onChange={setText} label={`Each month (${cur})`} keyboard="decimal-pad" placeholder="0.00" error={v == null ? 'Not a number' : null} />
       {suggested > 0 && <Small>Half of the shared budget is about {money(suggested, cur)} a month.</Small>}
       <PixelButton text="Set" kind="secondary" enabled={v != null && v !== (line?.amount ?? 0)} onPress={() => setMyShare(v!)} />
-      <Small>It's a fixed cost in your budget from this month on, so your daily budget already allows for it. Date spending then comes out of the shared fund only: tag an expense "Date budget" under Count toward.</Small>
-    </Window>
+      <Small>It's a fixed cost in your budget from this month on, so your daily budget already allows for it. Date spending then comes out of the shared fund only: add an expense as usual and pick Date budget under Count toward.</Small>
+    </Section>
   )
 }
 
 function AddWindow({ cur }: { cur: string }) {
   return (
-    <Window title="Add">
+    <Section title="One-off top up or expense">
       <TxForm cur={cur} onSave={addTx} />
-    </Window>
+    </Section>
   )
 }
 
@@ -200,38 +244,5 @@ function TxForm({ cur, tx, onSave, onDone }: { cur: string; tx?: Tx; onSave: (d:
       }} />
       {err && <Small color={Px.red}>! {err}</Small>}
     </View>
-  )
-}
-
-function History({ cur }: { cur: string }) {
-  const ds = useDate()
-  const [editing, setEditing] = useState<Tx | null>(null)
-  return (
-    <Window title="History">
-      {ds.all.length === 0 && <Small>Nothing yet. Add your first date.</Small>}
-      {ds.all.map((t) => (
-        <View key={t.id} style={{ gap: 4 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ flex: 1 }}>
-              <Body>{t.note || (t.kind === 'expense' ? 'Expense' : 'Top up')}</Body>
-              <Small>{`${t.date}${t.auto ? '' : ` · ${ds.budget!.names[t.by] ?? 'Partner'}`}`}</Small>
-            </View>
-            <Text style={[Type.body, { color: t.kind === 'expense' ? Px.brown : Px.green }]}>{(t.kind === 'expense' ? '−' : '+') + money(t.amount, cur)}</Text>
-          </View>
-          {!t.auto && (
-            <View style={{ flexDirection: 'row', gap: 8 }}>
-              <Pressable role="button" onPress={() => setEditing(t)}><Small color={Px.blue}>Edit</Small></Pressable>
-              <Pressable role="button" onPress={() => { if (confirm(`Delete ${money(t.amount, cur)} ${t.note || t.kind}?`)) deleteTx(t.id) }}><Small color={Px.red}>Delete</Small></Pressable>
-            </View>
-          )}
-          <Rule />
-        </View>
-      ))}
-      {editing && (
-        <PixelDialog title="Edit" onDismiss={() => setEditing(null)}>
-          <TxForm cur={cur} tx={editing} onSave={(d) => updateTx(editing.id, d)} onDone={() => setEditing(null)} />
-        </PixelDialog>
-      )}
-    </Window>
   )
 }

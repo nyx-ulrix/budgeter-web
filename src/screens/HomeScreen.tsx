@@ -74,6 +74,7 @@ export function HomeScreen() {
             : snap.dipping ? `${money(snap.dipped, cur)} of your ${money(snap.target, cur)} savings target spent`
               : `${money(snap.left, cur)} left` + (snap.target > 0 ? ` · ${money(snap.target, cur)} kept for savings` : '')
         ) + ` · ${daysLeft} days to go · resets ${snap.period.end}`}</Small>
+        {ds.phase === 'ready' && <Small>{`Date fund: ${money(ds.left, cur)} left (shared, outside this budget)`}</Small>}
       </Window>
 
       <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -91,13 +92,6 @@ export function HomeScreen() {
           </View>
           <Small>Trip spending doesn't touch your daily budget.</Small>
           <PixelButton text="Open trip" onPress={() => nav.go({ kind: 'trip', id: trip.id })} kind="secondary" style={{ alignSelf: 'flex-start' }} />
-        </FoldWindow>
-      )}
-
-      {ds.phase === 'ready' && (
-        <FoldWindow title="Date budget">
-          <Body color={ds.left < 0 ? Px.red : Px.brown}>{money(ds.left, cur)} left to spend on dates</Body>
-          <PixelButton text="Open date budget" onPress={() => nav.go({ kind: 'date' })} kind="secondary" style={{ alignSelf: 'flex-start' }} />
         </FoldWindow>
       )}
 

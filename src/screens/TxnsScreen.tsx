@@ -10,9 +10,12 @@ import { ArtImg, Body, Chip, Choice, FoldWindow, KeyValue, Label, Page, PixelBut
 import { useNav } from '../ui/nav'
 import { Px, Type } from '../ui/theme'
 import { Toggles } from './ExpenseScreen'
+import { useDate } from '../date/client'
+import type { Tx as DateTx } from '../date/money'
+import { DateTxnRow, useDateRefresh } from './DateScreen'
 
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
-const SCOPES = ['All', 'Budget', 'Trips', 'Split']
+const SCOPES = ['All', 'Budget', 'Trips', 'Split', 'Dates']
 
 export function TxnsScreen() {
   const st = useAppState()
@@ -31,6 +34,15 @@ export function TxnsScreen() {
     .sort((a, b) => (a.sort < b.sort ? 1 : a.sort > b.sort ? -1 : 0))
     .map((x) => x.t)
   const active = !!query.trim() || scope !== 'All' || category != null
+  // Date budget entries (shared fund) join the list; they're not in "My share total" since the fund pays for them.
+  const ds = useDate()
+  useDateRefresh()
+  const dates = ds.phase !== 'ready' || category != null || (scope !== 'All' && scope !== 'Dates') ? []
+    : ds.txs.filter((d) => inPeriod(p, d.date) && (!query.trim() || d.note.toLowerCase().includes(q)))
+  const rows: ({ k: 'txn'; t: Txn; date: string } | { k: 'date'; d: DateTx; date: string })[] = [
+    ...(scope === 'Dates' ? [] : list.map((t) => ({ k: 'txn' as const, t, date: t.date }))),
+    ...dates.map((d) => ({ k: 'date' as const, d, date: d.date })),
+  ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
 
   return (
     <Page>
@@ -50,12 +62,12 @@ export function TxnsScreen() {
         {active && <PixelButton text="Clear" kind="secondary" onPress={() => { setQuery(''); setScope('All'); setCategory(null) }} />}
       </FoldWindow>
       </Side>
-      <Window title={`${list.length} items`}>
-        {list.length === 0 && <Small>Nothing here.</Small>}
-        {list.map((t, i) => (
-          <View key={t.id} style={{ gap: 10 }}>
-            {(i === 0 || list[i - 1].date !== t.date) && <Label>{`${DOW[new Date(t.date + 'T00:00:00Z').getUTCDay()]} ${t.date}`}</Label>}
-            <TxnRow txn={t} trackPaid />
+      <Window title={`${rows.length} items`}>
+        {rows.length === 0 && <Small>Nothing here.</Small>}
+        {rows.map((r, i) => (
+          <View key={r.k === 'txn' ? r.t.id : 'date-' + r.d.id} style={{ gap: 10 }}>
+            {(i === 0 || rows[i - 1].date !== r.date) && <Label>{`${DOW[new Date(r.date + 'T00:00:00Z').getUTCDay()]} ${r.date}`}</Label>}
+            {r.k === 'txn' ? <TxnRow txn={r.t} trackPaid /> : <DateTxnRow tx={r.d} />}
           </View>
         ))}
         {list.length > 0 && (

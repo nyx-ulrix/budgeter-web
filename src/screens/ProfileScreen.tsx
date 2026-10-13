@@ -46,7 +46,6 @@ export function ProfileScreen() {
       <Window title="Settings">
         <PixelButton text="Country, currency, month start" onPress={() => nav.go({ kind: 'editSetup' })} kind="secondary" />
         <PixelButton text="AI receipt reading" onPress={() => nav.go({ kind: 'ai' })} kind="secondary" art="icon_receipt" />
-        <PixelButton text="Date budget (shared)" onPress={() => nav.go({ kind: 'date' })} kind="secondary" art="icon_heart" />
         <PixelButton text="Google Sheets sync" onPress={() => nav.go({ kind: 'sync' })} kind="secondary" glyph={Glyphs.sync} />
         <PixelButton text="Credits" onPress={() => nav.go({ kind: 'credits' })} kind="secondary" art="icon_heart" />
       </Window>

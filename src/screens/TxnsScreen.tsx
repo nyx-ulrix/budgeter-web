@@ -29,7 +29,7 @@ export function TxnsScreen() {
     .filter((t) => inPeriod(p, t.date))
     .filter((t) => category == null || t.category === category || t.items.some((i) => i.category === category))
     .filter((t) => !query.trim() || [t.merchant, t.note, t.items.map((i) => i.name).join(', ')].join(' ').toLowerCase().includes(q))
-    .filter((t) => scope === 'Budget' ? t.tripId == null : scope === 'Trips' ? t.tripId != null : scope === 'Split' ? isSplit(t) : true)
+    .filter((t) => scope === 'Budget' ? t.tripId == null : scope === 'Trips' ? t.tripId != null : scope === 'Split' ? isSplit(t) : scope !== 'Dates')
     .map((t) => ({ t, sort: t.date + String(t.updatedAt).padStart(15, '0') }))
     .sort((a, b) => (a.sort < b.sort ? 1 : a.sort > b.sort ? -1 : 0))
     .map((x) => x.t)
@@ -40,7 +40,7 @@ export function TxnsScreen() {
   const dates = ds.phase !== 'ready' || category != null || (scope !== 'All' && scope !== 'Dates') ? []
     : ds.txs.filter((d) => inPeriod(p, d.date) && (!query.trim() || d.note.toLowerCase().includes(q)))
   const rows: ({ k: 'txn'; t: Txn; date: string } | { k: 'date'; d: DateTx; date: string })[] = [
-    ...(scope === 'Dates' ? [] : list.map((t) => ({ k: 'txn' as const, t, date: t.date }))),
+    ...list.map((t) => ({ k: 'txn' as const, t, date: t.date })),
     ...dates.map((d) => ({ k: 'date' as const, d, date: d.date })),
   ].sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0))
 

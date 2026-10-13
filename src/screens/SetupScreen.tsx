@@ -104,12 +104,9 @@ function SignIn({ onSkip, onNew }: { onSkip: () => void; onNew: () => void }) {
 
   return (
     <Window title="Welcome.exe">
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <ArtImg name="app_icon" size={96} label="Budgeter" />
-        <View style={{ flex: 1, gap: 6 }}>
-          <Text role="heading" style={Type.hero}>HELLO!</Text>
-          <Body>{done ? "You're new here. Fill in a few things below to start." : 'Sign in with Google to start.'}</Body>
-        </View>
+      <View style={{ gap: 6 }}>
+        <Text role="heading" style={Type.hero}>HELLO!</Text>
+        <Body>{done ? "You're new here. Fill in a few things below to start." : 'Sign in with Google to start.'}</Body>
       </View>
       {!done && <>
         <Small>Already use Budgeter on your phone or another browser? Your budget loads by itself. New? You'll set it up next. Both apps then share everything through a Google Sheet in your own Drive.</Small>

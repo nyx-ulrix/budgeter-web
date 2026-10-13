@@ -23,7 +23,8 @@
     "android": "expo start --android",
     "ios": "expo start --ios",
     "web": "expo start --web",
-    "test": "tsx --test src/**/*.test.ts"
+    "test": "tsx --test src/**/*.test.ts",
+    "build:web": "expo export -p web && node -e \"const f='dist/index.html',fs=require('fs');fs.writeFileSync(f,fs.readFileSync(f,'utf8').replace('/favicon.ico','/favicon.ico?v='+Date.now()))\""
   },
   "private": true
 }

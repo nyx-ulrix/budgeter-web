@@ -37,7 +37,7 @@ npx tsc --noEmit         # typecheck
 ## Deploy
 
 ```bash
-npx expo export -p web
+npm run build:web
 firebase deploy --only hosting
 ```
 

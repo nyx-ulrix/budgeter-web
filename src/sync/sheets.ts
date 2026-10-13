@@ -52,7 +52,7 @@ async function append(token: string, id: string, tab: string, rows: unknown[][])
   await http('POST', `${API}/${id}/values/${range(`'${tab}'!A1`)}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`, token, { values: rows })
 }
 async function addTab(token: string, id: string, tab: string, header = HEADER) {
-  await http('POST', `${API}/${id}:batchUpdate`, token, { requests: [{ addSheet: { properties: { title: tab } } }] })
+  await http('POST', `${API}/${id}:batchUpdate`, token, { requests: [{ addSheet: { properties: { title: tab, ...(tab === SYNC_TAB ? { hidden: true } : {}) } } }] })
   await batchUpdate(token, id, [[`'${tab}'!A1:${col(header.length)}1`, header]])
 }
 async function idRows(token: string, id: string, tab: string): Promise<Map<string, number>> {

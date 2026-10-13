@@ -34,7 +34,8 @@ export function TxnsScreen() {
     .sort((a, b) => (a.sort < b.sort ? 1 : a.sort > b.sort ? -1 : 0))
     .map((x) => x.t)
   const active = !!query.trim() || scope !== 'All' || category != null
-  // Date budget entries (shared fund) join the list. Total = my share of each expense plus date spending (not top-ups).
+  // Date budget entries (shared fund) join the list. Total = my share of each expense plus the date spending I paid
+  // (not my partner's, so a meal counts once, for whoever paid; not top-ups).
   const ds = useDate()
   useDateRefresh()
   const dates = ds.phase !== 'ready' || category != null || (scope !== 'All' && scope !== 'Dates') ? []
@@ -73,7 +74,7 @@ export function TxnsScreen() {
         {rows.length > 0 && (
           <>
             <Rule />
-            <KeyValue k="Total" v={money(list.reduce((a, t) => a + myShare(t), 0) + dates.reduce((a, d) => a + (d.kind === 'expense' ? d.amount : 0), 0), currency(st))} />
+            <KeyValue k="Total" v={money(list.reduce((a, t) => a + myShare(t), 0) + dates.reduce((a, d) => a + (d.kind === 'expense' && d.by === ds.uid ? d.amount : 0), 0), currency(st))} />
           </>
         )}
       </Window>

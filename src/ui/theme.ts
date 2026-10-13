@@ -9,6 +9,7 @@ export const Px = {
   navy: '#10172F',
   brown: '#2B1D12',
   blue: '#2459A6',
+  pink: '#E0679A', // date budget: the second partner
   green: '#4A9A78',
   red: '#C93721',
   white: '#FFF4DC',
@@ -44,12 +45,12 @@ export const Glyphs = {
   image: ['#########', '#.......#', '#.##....#', '#.##....#', '#.....#.#', '#....###.', '#...#####', '#.#######', '#########'],
   camera: ['.........', '..###....', '#########', '#...#...#', '#..###..#', '#..###..#', '#...#...#', '#########', '.........'],
   plane: ['....#....', '...###...', '...###...', '#########', '#########', '...###...', '...###...', '..#####..', '.........'],
+  heart: ['.##...##.', '####.####', '#########', '#########', '.#######.', '..#####..', '...###...', '....#....', '.........'],
   sync: ['..#####..', '.#.....#.', '#.......#', '#....####', '#.....##.', '.##.....#', '####....#', '.#.....#.', '..#####..'],
 }
 
 export const Art = {
   app_icon: require('../../assets/app-icon.png'),
-  mascot_idle: require('../../assets/art/mascot_idle.png'),
   icon_coin: require('../../assets/art/icon_coin.png'),
   icon_star: require('../../assets/art/icon_star.png'),
   icon_airplane: require('../../assets/art/icon_airplane.png'),
@@ -58,7 +59,5 @@ export const Art = {
   icon_suitcase: require('../../assets/art/icon_suitcase.png'),
   icon_money_bag: require('../../assets/art/icon_money_bag.png'),
   icon_heart: require('../../assets/art/icon_heart.png'),
-  char_princess_face: require('../../assets/art/char_princess_face.png'),
-  char_boy_face: require('../../assets/art/char_boy_face.png'),
 }
 export type ArtName = keyof typeof Art

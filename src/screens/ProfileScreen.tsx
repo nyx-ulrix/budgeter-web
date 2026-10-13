@@ -14,6 +14,7 @@ import { PACE_LABEL, Pace } from '../core/budget'
 import { Ai, PRESETS, Provider, chat, models, preset, safeBase } from '../ai/ai'
 import { startOpenRouter } from '../ai/openrouter'
 import { requestToken, signOut } from '../sync/google'
+import { signOut as dateSignOut, useDate } from '../date/client'
 import { syncNow } from '../sync/sheets'
 
 const row = { flexDirection: 'row', alignItems: 'center', gap: 8 } as const
@@ -26,6 +27,7 @@ export function ProfileScreen() {
   const s = st.setup!
   const snap = snapshot(st)
   const months = new Set(st.txns.map((t) => t.date.slice(0, 7))).size
+  const date = useDate()
   return (
     <Page>
       <Window title="Profile.exe">
@@ -48,6 +50,7 @@ export function ProfileScreen() {
         <PixelButton text="AI receipt reading" onPress={() => nav.go({ kind: 'ai' })} kind="secondary" art="icon_receipt" />
         <PixelButton text="Google Sheets sync" onPress={() => nav.go({ kind: 'sync' })} kind="secondary" glyph={Glyphs.sync} />
         <PixelButton text="Credits" onPress={() => nav.go({ kind: 'credits' })} kind="secondary" art="icon_heart" />
+        {date.phase !== 'signedOut' && <PixelButton text="Sign out of the date budget" onPress={dateSignOut} kind="secondary" glyph={Glyphs.heart} />}
       </Window>
       <Side><CategoriesWindow st={st} /></Side>
       <Small>Budgeter for the web</Small>
@@ -314,7 +317,6 @@ export function CreditsScreen() {
         <Small>pixel-boy.itch.io/ninja-adventure-asset-pack</Small>
         <Body>1-bit Pixel Icons by Nikoichu (CC0)</Body>
         <Small>nikoichu.itch.io/pixel-icons</Small>
-        <Small>Placeholder art.</Small>
       </Window>
       <Window title="Fonts">
         <Body>Press Start 2P, Silkscreen, VT323</Body>

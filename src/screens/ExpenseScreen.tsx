@@ -15,7 +15,8 @@ import {
   SearchPicker, Small, Window, Side } from '../ui/components'
 import { Screen, useNav } from '../ui/nav'
 import { Px, Type } from '../ui/theme'
-import { addTx, useDate } from '../date/client'
+import { addTx, deleteTx, updateTx, useDate } from '../date/client'
+import type { Tx as DateTx } from '../date/money'
 const DATE = 'date' // Count toward: the shared date budget
 
 type ExpenseRoute = Extract<Screen, { kind: 'expense' }>
@@ -84,13 +85,15 @@ function loadReceipt(d: Draft, r: ParsedReceipt, fallbackCur: string): Draft {
   }
 }
 
-function draftFrom(st: AppState, s: ExpenseRoute): Draft {
+function draftFrom(st: AppState, s: ExpenseRoute, dateTx?: DateTx): Draft {
   const home = currency(st)
   let d: Draft = {
     itemised: false, amount: '', tax: '', service: '', discount: '', printedTotal: '', taxIncluded: false, merchant: '',
     date: todayIso(), category: 'Other', note: '', tripId: null, paidCur: home, rate: '1',
     people: 1, payer: ME, method: 'EQUAL', inputs: {}, items: [],
   }
+  // A date budget expense (shared fund): only amount, name and date live there.
+  if (dateTx) return { ...d, amount: plain(dateTx.amount, home), merchant: dateTx.note, date: dateTx.date, tripId: DATE }
   const t = s.id != null ? st.txns.find((x) => x.id === s.id) : undefined
   if (t) {
     const cur = t.foreign?.currency ?? home
@@ -123,12 +126,15 @@ function draftFrom(st: AppState, s: ExpenseRoute): Draft {
 }
 
 export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
-  const dateReady = useDate().phase === 'ready'
+  const ds = useDate()
+  const dateReady = ds.phase === 'ready'
+  const dateTx = s.dateId != null ? ds.txs.find((x) => x.id === s.dateId) : undefined
   const st = useAppState()
   const nav = useNav()
   const home = currency(st)
-  const [d, setD] = useState<Draft>(() => draftFrom(st, s))
+  const [d, setD] = useState<Draft>(() => draftFrom(st, s, dateTx))
   const existing = s.id != null ? st.txns.find((x) => x.id === s.id) : undefined
+  const editing = !!existing || !!dateTx
   const [catFor, setCatFor] = useState<string | null>(null) // item key
   const [rereading, setRereading] = useState(false)
   const [readError, setReadError] = useState<string | null>(null)
@@ -207,11 +213,13 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
   }
 
   function save() {
-    if (d.tripId === DATE) { // the shared date fund, not my budget
-      addTx({ kind: 'expense', amount: totalHome, note: (d.merchant.trim() || d.note.trim() || 'Date').slice(0, 100), date: d.date })
-        .then(() => nav.back()).catch((e) => alert(e.message))
+    if (d.tripId === DATE) { // the shared date fund, not my budget; moving a normal expense there takes it out of my budget
+      const draft = { kind: 'expense' as const, amount: totalHome, note: (d.merchant.trim() || d.note.trim() || 'Date').slice(0, 100), date: d.date }
+      ;(dateTx ? updateTx(dateTx.id, draft) : addTx(draft))
+        .then(() => { if (existing) store.update((x) => deleteTxn(x, existing.id)); nav.back() }).catch((e) => alert(e.message))
       return
     }
+    if (dateTx) deleteTx(dateTx.id).catch((e) => alert(e.message)) // moved out of the date budget into my own
     const t: Txn = {
       id: existing?.id ?? newId(),
       date: d.date,
@@ -266,7 +274,7 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
   return (
     <>
       <Page>
-        <PageHeader title={existing ? 'Edit' : s.receipt ? 'Check receipt' : 'New expense'} />
+        <PageHeader title={editing ? 'Edit' : s.receipt ? 'Check receipt' : 'New expense'} />
 
         <Window title={d.itemised ? 'Receipt items' : 'Expense'}>
           <Choice options={[false, true]} selected={d.itemised} label={(it) => (it ? 'Itemised' : 'Simple')}
@@ -314,18 +322,20 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
         <Window title="Details">
           <PixelField value={d.merchant} onChange={(v) => set({ merchant: v })} label="Name" placeholder="What was it?" />
           <DateField label="Date" value={d.date} onChange={(v) => set({ date: v })} />
-          <Label>Category</Label>
-          <Choice options={st.categories} selected={d.category} label={(c) => c} onSelect={(c) => set({ category: c })} />
-          <PixelField value={d.note} onChange={(v) => set({ note: v })} label="Note" multiline />
+          {d.tripId !== DATE && <>
+            <Label>Category</Label>
+            <Choice options={st.categories} selected={d.category} label={(c) => c} onSelect={(c) => set({ category: c })} />
+            <PixelField value={d.note} onChange={(v) => set({ note: v })} label="Note" multiline />
+          </>}
           {cur !== home && (
             <PixelField value={d.rate} onChange={(v) => set({ rate: v })} label={`Paid in ${cur} · 1 ${cur} = ? ${home}`} keyboard="decimal-pad" />
           )}
         </Window>
 
         <Side>
-        {(st.trips.length > 0 || dateReady) && (
+        {(st.trips.length > 0 || dateReady || dateTx) && (
           <Window title="Count toward">
-            <Choice<string | null> options={[null, ...trips.map((t) => t.id), ...(dateReady && !existing ? [DATE] : [])]} selected={d.tripId}
+            <Choice<string | null> options={[null, ...trips.map((t) => t.id), ...(dateReady ? [DATE] : [])]} selected={d.tripId}
               label={(id) => (id == null ? 'Monthly budget' : id === DATE ? 'Date budget' : 'Trip: ' + (trips.find((t) => t.id === id)?.name ?? ''))}
               onSelect={(id) => {
                 const t = trips.find((x) => x.id === id)
@@ -389,10 +399,11 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
         </Side>
 
         {errors.map((e, i) => <Text key={i} style={[Type.small, { color: Px.red }]}>! {e}</Text>)}
-        <PixelButton text={existing ? 'Save changes' : 'Save expense'} onPress={save} enabled={errors.length === 0} />
+        <PixelButton text={editing ? 'Save changes' : 'Save expense'} onPress={save} enabled={errors.length === 0} />
         {existing && (
           <PixelButton text="Delete" kind="danger" onPress={() => { store.update((x) => deleteTxn(x, existing.id)); nav.back() }} />
         )}
+        {dateTx && <PixelButton text="Delete" kind="danger" onPress={() => { deleteTx(dateTx.id).catch((e) => alert(e.message)); nav.back() }} />}
       </Page>
 
       {pickingFor && (

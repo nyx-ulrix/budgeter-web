@@ -1,7 +1,8 @@
 import React, { createElement, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { Glyphs, Px, Type } from '../ui/theme'
-import { Body, Chip, Choice, DateField, FoldWindow, KeyValue, Label, PixelButton, PixelDialog, PixelField, Rule, Small } from '../ui/components'
+import { useNav } from '../ui/nav'
+import { Body, Choice, FoldWindow, Glyph, KeyValue, Label, PixelButton, PixelDialog, PixelField, Rule, Small } from '../ui/components'
 import { store, useAppState } from '../data/store'
 import { AppState, Line, newId } from '../data/state'
 import { currency, periodOf, planFor } from '../data/ledger'
@@ -9,7 +10,7 @@ import { editPlan } from '../data/actions'
 import { money, parseMoney, plain } from '../core/money'
 import { inPeriod, Period, todayIso } from '../core/budget'
 import { CLIENT_ID, loadGis } from '../sync/google'
-import { addTx, create, deleteTx, Draft, join, refresh, setPlan, signIn, signOut, updateTx, useDate } from '../date/client'
+import { addTx, create, deleteTx, Draft, join, refresh, setPlan, signIn, updateTx, useDate } from '../date/client'
 import { currentStep, EVERY, Every, totals, Tx, withBudget } from '../date/money'
 
 declare const google: any
@@ -84,34 +85,38 @@ export function DateBudgetFold({ period }: { period: Period }) {
       {ds.phase === 'ready' && <>
         <Fund cur={cur} period={period} />
         <PlanWindow cur={cur} />
-        <ShareWindow cur={cur} />
         <AddWindow cur={cur} />
       </>}
-      {ds.phase !== 'signedOut' && ds.phase !== 'loading' && <PixelButton text="Sign out of the date budget" kind="secondary" onPress={signOut} />}
     </FoldWindow>
   )
 }
 
-/** A date budget entry in the Txns list. Tap to edit or delete; it's paid from the shared fund, not my budget. */
+/** Who paid, as a colour: the budget's first member is blue, the second pink (the same on both partners' phones). */
+export const payerColor = (members: string[] | undefined, by: string) =>
+  by && members?.[0] === by ? Px.blue : by && members?.[1] === by ? Px.pink : Px.orange
+
+/** A date budget entry in the Txns list, marked with a heart in the payer's colour. Expenses open the expense editor; top-ups edit here. */
 export function DateTxnRow({ tx }: { tx: Tx }) {
   const st = useAppState()
   const ds = useDate()
+  const nav = useNav()
   const cur = currency(st)
   const [editing, setEditing] = useState(false)
+  const expense = tx.kind === 'expense'
+  const who = ds.budget?.names[tx.by] ?? (tx.by ? 'Partner' : 'Shared')
   return (
     <>
-      <Pressable role="button" onPress={() => setEditing(true)} style={{ gap: 4 }}>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Body style={{ flex: 1 }}>{tx.note || (tx.kind === 'expense' ? 'Date' : 'Top up')}</Body>
-          <Text style={[Type.body, { color: tx.kind === 'expense' ? Px.brown : Px.green }]}>{(tx.kind === 'expense' ? '' : '+') + money(tx.amount, cur)}</Text>
+      <Pressable role="button" aria-label={`Edit ${tx.note || 'date budget entry'}`} onPress={() => expense ? nav.go({ kind: 'expense', dateId: tx.id }) : setEditing(true)}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 8, minHeight: 48, paddingVertical: 4 }}>
+        <Glyph rows={Glyphs.heart} color={payerColor(ds.budget?.members, tx.by)} size={18} />
+        <View style={{ flex: 1, gap: 4 }}>
+          <Body>{tx.note || (expense ? 'Date' : 'Top up')}</Body>
+          <Small>{`${expense ? 'Date budget' : 'Top up'} · ${who}`}</Small>
         </View>
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Chip text="Date budget" color={Px.blue} />
-          <Small>{`${tx.kind === 'expense' ? 'Shared fund' : 'Added to the shared fund'} · ${ds.budget?.names[tx.by] ?? 'Partner'}`}</Small>
-        </View>
+        <Text style={[Type.body, { color: expense ? Px.brown : Px.green }]}>{(expense ? '' : '+') + money(tx.amount, cur)}</Text>
       </Pressable>
       {editing && (
-        <PixelDialog title="Date budget" onDismiss={() => setEditing(false)}>
+        <PixelDialog title="Top up" onDismiss={() => setEditing(false)}>
           <TxForm cur={cur} tx={tx} onSave={(d) => updateTx(tx.id, d)} onDone={() => setEditing(false)} />
           <PixelButton text="Delete" kind="danger" onPress={() => { deleteTx(tx.id); setEditing(false) }} />
         </PixelDialog>
@@ -234,18 +239,6 @@ function PlanWindow({ cur }: { cur: string }) {
   )
 }
 
-/** My contribution, set aside from my own budget every month (a fixed cost that follows the split). */
-function ShareWindow({ cur }: { cur: string }) {
-  const st = useAppState()
-  const line = dateLine(st)
-  return (
-    <Section title="From your budget">
-      <Body>{line ? `${money(line.amount, cur)} a month is set aside from your budget for dates.` : 'Nothing is set aside from your budget yet. Save your contribution above.'}</Body>
-      <Small>It follows what you put in (weekly and 2-weekly amounts are turned into a monthly figure). It's a fixed cost from this month on, so your daily budget already allows for it. Date spending then comes out of the shared fund only: add an expense as usual and pick Date budget under Count toward.</Small>
-    </Section>
-  )
-}
-
 function AddWindow({ cur }: { cur: string }) {
   return (
     <Section title="One-off top up">
@@ -255,24 +248,20 @@ function AddWindow({ cur }: { cur: string }) {
   )
 }
 
-/** Amount, what for and date of a date budget entry. Its kind is fixed: new ones here are top-ups; edits keep theirs. */
+/** The amount of a top-up. New ones are dated today; edits keep their date and note. */
 function TxForm({ cur, tx, kind: newKind = 'topup', onSave, onDone }: { cur: string; tx?: Tx; kind?: Tx['kind']; onSave: (d: Draft) => Promise<void>; onDone?: () => void }) {
   const kind = tx?.kind ?? newKind
   const [amount, setAmount] = useState(tx ? plain(tx.amount, cur) : '')
-  const [note, setNote] = useState(tx?.note ?? '')
-  const [date, setDate] = useState(tx?.date ?? todayIso())
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState<string | null>(null)
   const v = parseMoney(amount, cur)
   return (
     <View style={{ gap: 10 }}>
       <PixelField value={amount} onChange={setAmount} label={`Amount (${cur})`} keyboard="decimal-pad" placeholder="0.00" />
-      <PixelField value={note} onChange={(s) => setNote(s.slice(0, 100))} label="What for" placeholder={kind === 'expense' ? 'Dinner, movie…' : 'Top up'} />
-      <DateField label="Date" value={date} onChange={setDate} />
       <PixelButton text={tx ? 'Save' : 'Add'} enabled={!busy && v != null && v > 0} onPress={() => {
         setBusy(true); setErr(null)
-        onSave({ kind, amount: v!, note: note.trim(), date })
-          .then(() => { if (!tx) { setAmount(''); setNote('') }; onDone?.() })
+        onSave({ kind, amount: v!, note: tx?.note ?? '', date: tx?.date ?? todayIso() })
+          .then(() => { if (!tx) setAmount(''); onDone?.() })
           .catch((e) => setErr(e.message)).finally(() => setBusy(false))
       }} />
       {err && <Small color={Px.red}>! {err}</Small>}

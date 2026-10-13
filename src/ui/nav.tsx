@@ -5,7 +5,7 @@ export type Tab = 'home' | 'txns' | 'budget' | 'profile'
 
 /** Screens pushed over the tabs. */
 export type Screen =
-  | { kind: 'expense'; id?: string; receipt?: ParsedReceipt; ocrText?: string; tripId?: string }
+  | { kind: 'expense'; id?: string; receipt?: ParsedReceipt; ocrText?: string; tripId?: string; dateId?: string }
   | { kind: 'planned'; id?: string }
   | { kind: 'trip'; id: string }
   | { kind: 'ai' }

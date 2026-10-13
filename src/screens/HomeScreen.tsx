@@ -50,9 +50,10 @@ export function HomeScreen() {
             <Text style={[Type.hero, { color: dayColor(snap.day) }]}>{money(snap.day.dailyLeft, cur)}</Text>
           </View>
         </View>
-        <View style={{ flexDirection: 'row', gap: 12 }}>
+        <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
           <Small>Today's budget {money(snap.day.budget, cur)}</Small>
           <Small>Spent {money(snap.day.spent, cur)}</Small>
+          {ds.phase === 'ready' && <Small>Date budget {money(monthLeft(ds.all, snap.period), cur)} left</Small>}
         </View>
         <PixelProgress
           fraction={snap.day.budget > 0 ? snap.day.spent / snap.day.budget : snap.day.spent > 0 ? 1 : 0}

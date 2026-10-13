@@ -2,7 +2,7 @@ import React, { useEffect } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { useFonts } from 'expo-font'
 import { Fonts, Glyphs, Px, Type } from './src/ui/theme'
-import { ArtImg, Chip, Glyph, Small, Window } from './src/ui/components'
+import { Avatar, Chip, Glyph, Small, Window } from './src/ui/components'
 import { NavProvider, Tab, useNav } from './src/ui/nav'
 import { ScannerProvider, useScanner } from './src/ocr/scanner'
 import { store, useAppState } from './src/data/store'
@@ -93,7 +93,7 @@ function Toolbar() {
   return (
     <View>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: Px.orange, minHeight: 48, paddingHorizontal: 10 }}>
-        <View style={{ borderWidth: 2, borderColor: Px.creamLight, padding: 2 }}><ArtImg name="mascot_idle" size={28} /></View>
+        <View style={{ borderWidth: 2, borderColor: Px.creamLight, padding: 2 }}><Avatar size={28} /></View>
         <Text style={[Type.number, { color: Px.creamLight, flex: 1 }]}>BUDGETER</Text>
         <Chip text={snap.period.key} color={Px.creamLight} />
         {st.sync.enabled && (

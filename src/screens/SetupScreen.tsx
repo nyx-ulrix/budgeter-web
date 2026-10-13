@@ -23,6 +23,7 @@ export function SetupScreen({ existing }: { existing: Setup | null | undefined }
   const [balance, setBalance] = useState('')
   const [pickCountry, setPickCountry] = useState(false)
   const [pickCurrency, setPickCurrency] = useState(false)
+  const [showForm, setShowForm] = useState(false)   // first run: the form only after sign-in finds nothing, or on skip
   const day = /^\d+$/.test(startDay) ? Number(startDay) : null
   const dayOk = day != null && day >= 1 && day <= 28
   const incomeMinor = income.trim() ? parseMoney(income, currency) : 0
@@ -31,19 +32,8 @@ export function SetupScreen({ existing }: { existing: Setup | null | undefined }
 
   return (
     <Page>
-      {first ? <>
-        <Window title="Welcome.exe">
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-            <ArtImg name="char_princess_face" size={96} label="Pixel-art guide character" />
-            <View style={{ flex: 1, gap: 6 }}>
-              <Text role="heading" style={Type.hero}>HELLO!</Text>
-              <Body>Let's set up your budget. You can change all of this later in Profile.</Body>
-            </View>
-          </View>
-        </Window>
-        <LoadFromSheets />
-      </> : <PageHeader title="Settings" />}
-
+      {first ? <SignIn onSkip={() => setShowForm(true)} onNew={() => setShowForm(true)} /> : <PageHeader title="Settings" />}
+      {first && !showForm ? null : <>
       <Window title="You">
         <PixelField value={name} onChange={setName} label="Name (optional)" />
       </Window>
@@ -67,10 +57,11 @@ export function SetupScreen({ existing }: { existing: Setup | null | undefined }
         </>}
       </Window>
       <PixelButton text={first ? 'Start budgeting' : 'Save'} enabled={ok} onPress={() => {
-        const s: Setup = { country, currency, startDay: day!, name: name.trim() }
+        const s: Setup = { ...existing, country, currency, startDay: day!, name: name.trim() } // keeps the profile picture
         if (first) store.update((st) => finishSetup(st, s, incomeMinor!, balanceMinor!))
         else { store.update((st) => editSetup(st, s)); nav.back() }
       }} />
+      </>}
 
       {pickCountry && (
         <SearchPicker title="Country" options={countries().map((c) => [c.code, `${c.name} (${c.code})`])} onDismiss={() => setPickCountry(false)}
@@ -85,24 +76,25 @@ export function SetupScreen({ existing }: { existing: Setup | null | undefined }
 }
 
 /**
- * First run only: pull an existing budget from the phone app's Google Sheet. Once the sync brings the setup
- * record in, the app leaves this screen by itself (App shows setup only while there is none).
+ * First run: sign in with Google. If that account already has a Budgeter sheet (phone or another browser), everything
+ * loads and the app opens by itself (it shows setup only while there is none). A new account gets the form.
  */
-function LoadFromSheets() {
+function SignIn({ onSkip, onNew }: { onSkip: () => void; onNew: () => void }) {
   const [busy, setBusy] = useState<string | null>(null)
   const [msg, setMsg] = useState<{ text: string; error: boolean } | null>(null)
+  const [done, setDone] = useState(false)
 
-  async function load() {
+  async function signIn() {
     setMsg(null)
     try {
       setBusy('Waiting for Google sign-in…')
       await requestToken(true) // must start inside the click: browsers block the popup otherwise
-      setBusy('Loading your budget from Google Sheets…')
+      setBusy('Looking for your budget in Google Sheets…')
       store.update((s) => setSync(s, (x) => ({ ...x, enabled: true, paused: undefined })))
       await syncNow()
       const st = store.get()
       if (st.sync.paused) setMsg({ text: st.sync.paused, error: true })
-      else if (!st.setup) setMsg({ text: 'No Budgeter data in that Google account yet. Turn on Google Sheets sync in the phone app first and let it sync, then try again. Or set up below: sync stays on.', error: false })
+      else if (!st.setup) { setDone(true); onNew() }
     } catch (e: any) {
       setMsg({ text: e?.message ?? 'Google sign-in failed.', error: true })
     } finally {
@@ -111,19 +103,28 @@ function LoadFromSheets() {
   }
 
   return (
-    <Window title="Already use Budgeter?" header={Px.blue}>
-      <Text role="heading" style={Type.number}>Already use Budgeter on your phone?</Text>
-      <Body>Load everything from Google Sheets instead of setting up again. In the phone app, turn on Profile → Google Sheets sync first, then sign in here with the same Google account.</Body>
-      <Small>Both apps then share everything through that Google Sheet: setup, budgets, expenses, trips and planned purchases. A change made in either one reaches the other.</Small>
-      <PixelButton text="Load from Google Sheets" glyph={Glyphs.sync} enabled={busy == null} onPress={load} />
-      {busy && (
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} aria-live="polite">
-          <ActivityIndicator color={Px.orange} />
-          <Small color={Px.brown}>{busy}</Small>
+    <Window title="Welcome.exe">
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+        <ArtImg name="app_icon" size={96} label="Budgeter" />
+        <View style={{ flex: 1, gap: 6 }}>
+          <Text role="heading" style={Type.hero}>HELLO!</Text>
+          <Body>{done ? "You're new here. Fill in a few things below to start." : 'Sign in with Google to start.'}</Body>
         </View>
-      )}
-      {msg && <Small color={msg.error ? Px.red : Px.brown}>{msg.error ? `! ${msg.text}` : msg.text}</Small>}
-      <Small>New here? Skip this and fill in the form below.</Small>
+      </View>
+      {!done && <>
+        <Small>Already use Budgeter on your phone or another browser? Your budget loads by itself. New? You'll set it up next. Both apps then share everything through a Google Sheet in your own Drive.</Small>
+        <PixelButton text="Sign in with Google" glyph={Glyphs.person} enabled={busy == null} onPress={signIn} />
+        {busy && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }} aria-live="polite">
+            <ActivityIndicator color={Px.orange} />
+            <Small color={Px.brown}>{busy}</Small>
+          </View>
+        )}
+        {msg && <Small color={msg.error ? Px.red : Px.brown}>{msg.error ? `! ${msg.text}` : msg.text}</Small>}
+        <PixelButton text="Continue without Google" kind="secondary" enabled={busy == null} onPress={onSkip} />
+        <Small>Without Google your budget stays in this browser only. You can connect later in Profile → Google Sheets sync.</Small>
+      </>}
+      {done && <Small>Signed in. Your budget will be kept in your Google Sheet and shared with the phone app.</Small>}
     </Window>
   )
 }

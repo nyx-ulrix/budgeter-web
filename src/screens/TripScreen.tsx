@@ -3,8 +3,7 @@ import { Pressable, Text, View } from 'react-native'
 import { Glyphs, Px, Type } from '../ui/theme'
 import {
   ArtImg, Body, Chip, Choice, CloseButton, DateField, FoldWindow, KeyValue, Label, Page, PageHeader, PickerBox, PixelButton, PixelDialog,
-  PixelField, PixelProgress, Rule, SearchPicker, Small, Window,
-} from '../ui/components'
+  PixelField, PixelProgress, Rule, SearchPicker, Small, Window, Avatar } from '../ui/components'
 import { useNav } from '../ui/nav'
 import { store, useAppState } from '../data/store'
 import { AppState, TRIP_COST_KINDS, Trip, myShare, normTrip, normTripCost, tripTarget } from '../data/state'
@@ -124,7 +123,7 @@ export function TripScreen({ id }: { id: string }) {
 
       <Window title={started ? 'Trip fund' : 'Fund so far'}>
         <View style={[row, { gap: 10 }]}>
-          <ArtImg name="mascot_idle" size={48} />
+          <Avatar size={48} />
           <View style={{ flex: 1 }}>
             <Label>Left in fund</Label>
             <Text style={[Type.hero, { color: left < 0 ? Px.red : Px.brown }]}>{money(left, cur)}</Text>

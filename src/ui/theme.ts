@@ -48,6 +48,7 @@ export const Glyphs = {
 }
 
 export const Art = {
+  app_icon: require('../../assets/app-icon.png'),
   mascot_idle: require('../../assets/art/mascot_idle.png'),
   icon_coin: require('../../assets/art/icon_coin.png'),
   icon_star: require('../../assets/art/icon_star.png'),

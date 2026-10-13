@@ -19,7 +19,7 @@
       "predictiveBackGestureEnabled": false
     },
     "web": {
-      "favicon": "./assets/art/mascot_idle.png",
+      "favicon": "./assets/app-icon.png",
       "name": "Budgeter",
       "shortName": "Budgeter",
       "description": "Pixel-art budget planner. Shares data with the Budgeter Android app through Google Sheets.",

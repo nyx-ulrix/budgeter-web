@@ -3,8 +3,7 @@ import { ActivityIndicator, Linking, Text, TextInput, View } from 'react-native'
 import { Glyphs, Px, Type } from '../ui/theme'
 import {
   ArtImg, Body, Chip, Choice, CloseButton, FoldWindow, Label, Page, PageHeader, PickerBox, PixelButton, PixelDialog, PixelField, Rule,
-  SearchPicker, Small, Window, frame, shadow,
-} from '../ui/components'
+  SearchPicker, Small, Window, frame, shadow, Avatar, avatarFromFile } from '../ui/components'
 import { useNav } from '../ui/nav'
 import { store, useAppState } from '../data/store'
 import { AppState, Txn } from '../data/state'
@@ -31,7 +30,7 @@ export function ProfileScreen() {
     <Page>
       <Window title="Profile.exe">
         <View style={[row, { gap: 12 }]}>
-          <ArtImg name="char_boy_face" size={88} label="Your pixel character" />
+          <Avatar size={88} label="Your profile picture" />
           <View style={{ flex: 1, gap: 4 }}>
             <Text style={Type.number}>{(s.name.trim() || 'Player 1').toUpperCase()}</Text>
             <Small>{`${countryName(s.country)} · ${s.currency}`}</Small>
@@ -39,6 +38,7 @@ export function ProfileScreen() {
             <Chip text={`${PACE_SYMBOL[snap.pace]} ${PACE_LABEL[snap.pace]}`} color={PACE_COLOR[snap.pace]} />
           </View>
         </View>
+        <PictureButtons />
         <Rule />
         <Label>Likes</Label>
         <Small>{'- Staying under budget\n- Receipts that add up'}</Small>
@@ -319,5 +319,31 @@ export function CreditsScreen() {
         <Small>SIL Open Font License 1.1</Small>
       </Window>
     </Page>
+  )
+}
+
+/** Upload or clear the profile picture. Synced to the phone with your settings. */
+function PictureButtons() {
+  const st = useAppState()
+  const input = React.useRef<HTMLInputElement | null>(null)
+  const [err, setErr] = useState<string | null>(null)
+  const set = (avatar?: string) => store.update((s) => ({ ...s, setup: { ...s.setup!, avatar } }))
+  return (
+    <View style={{ gap: 6 }}>
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+        <PixelButton text={st.setup?.avatar ? 'Change picture' : 'Upload a picture'} kind="secondary" onPress={() => input.current?.click()} />
+        {!!st.setup?.avatar && <PixelButton text="Use app icon" kind="secondary" onPress={() => set(undefined)} />}
+      </View>
+      <Small>Shown at the top, on Home and here, on your phone too.</Small>
+      {err && <Small color={Px.red}>! {err}</Small>}
+      {React.createElement('input', {
+        ref: input, type: 'file', accept: 'image/*', style: { display: 'none' },
+        onChange: async (e: any) => {
+          const f = e.target.files?.[0]; e.target.value = ''
+          if (!f) return
+          try { setErr(null); set(await avatarFromFile(f)) } catch { setErr("Couldn't read that picture.") }
+        },
+      })}
+    </View>
   )
 }

@@ -6,7 +6,7 @@ import { activeTrip, currency, dailyImpact, liveTxns, snapshot, Snapshot, tripFu
 import { Planned } from '../data/state'
 import { useAppState } from '../data/store'
 import { useScanner } from '../ocr/scanner'
-import { ArtImg, Body, Chip, FoldWindow, Label, Page, PixelButton, PixelProgress, Small, Window, frame } from '../ui/components'
+import { ArtImg, Body, Chip, FoldWindow, Label, Page, PixelButton, PixelProgress, Small, Window, frame, Avatar } from '../ui/components'
 import { MonthBar, Swatch } from '../ui/MonthBar'
 import { useNav } from '../ui/nav'
 import { Glyphs, Px, Type } from '../ui/theme'
@@ -41,7 +41,7 @@ export function HomeScreen() {
       {/* Above the fold: today, this month, quick actions. */}
       <Window title="Today.exe">
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-          <ArtImg name="mascot_idle" size={56} />
+          <Avatar size={56} />
           <View style={{ flex: 1, gap: 4 }}>
             <Label>Left to spend today</Label>
             <Text style={[Type.hero, { color: dayColor(snap.day) }]}>{money(snap.day.dailyLeft, cur)}</Text>

@@ -36,6 +36,7 @@ export interface Setup {
   currency: string // ISO 4217, e.g. "SGD"
   startDay: number // budget period starts on this day of the month (1–28)
   name: string
+  avatar?: string // profile picture as a small JPEG data URL; synced with the phone through the setup record
 }
 
 /**
@@ -181,8 +182,7 @@ const set = (xs: string[] | null | undefined): string[] => [...new Set(xs ?? [])
 const rec = <T>(o: Record<string, T> | null | undefined): Record<string, T> => ({ ...(o ?? {}) })
 
 export const normSetup = (o: Loose<Setup>): Setup => ({
-  country: o.country ?? '', currency: o.currency ?? '', startDay: o.startDay ?? 1, name: o.name ?? '',
-})
+  country: o.country ?? '', currency: o.currency ?? '', startDay: o.startDay ?? 1, name: o.name ?? '', ...(o.avatar ? { avatar: o.avatar } : {}) })
 
 export const normLine = (o: Loose<Line>): Line => ({
   id: o.id ?? newId(), kind: o.kind ?? 'EXTRA', name: o.name ?? '', amount: o.amount ?? 0,

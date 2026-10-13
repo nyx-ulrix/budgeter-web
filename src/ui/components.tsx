@@ -2,6 +2,7 @@ import React, { ReactNode, createElement, useRef, useState } from 'react'
 import { Image, Modal, Pressable, ScrollView, Text, TextInput, View, ViewStyle } from 'react-native'
 import { Art, ArtName, Px, Type } from './theme'
 import { useNav } from './nav'
+import { useAppState } from '../data/store'
 
 /** Hard offset shadow like the brief's `box-shadow: 4px 4px 0`. */
 export const shadow = (d = 4, color = Px.brown): ViewStyle => ({ boxShadow: `${d}px ${d}px 0 ${color}` } as ViewStyle)
@@ -265,4 +266,24 @@ export function SearchPicker({ title, options, onDismiss, onPick, allowCustom = 
       ))}
     </PixelDialog>
   )
+}
+
+/**
+ * Your profile picture wherever the app shows a character: the photo you uploaded (Profile), otherwise the app icon.
+ * The photo lives in the setup record, so it's the same on the phone and the web.
+ */
+export function Avatar({ size, label }: { size: number; label?: string }) {
+  const photo = useAppState().setup?.avatar
+  if (!photo) return <ArtImg name="app_icon" size={size} label={label} />
+  return <Image source={{ uri: photo }} style={{ width: size, height: size }} accessibilityLabel={label ?? 'Profile picture'} />
+}
+
+/** A picked photo as a small square JPEG data URL (centre crop, 128 px): small enough to sync in one sheet cell. */
+export async function avatarFromFile(file: File): Promise<string> {
+  const bmp = await createImageBitmap(file, { imageOrientation: 'from-image' })
+  const side = Math.min(bmp.width, bmp.height)
+  const c = document.createElement('canvas')
+  c.width = c.height = 128
+  c.getContext('2d')!.drawImage(bmp, (bmp.width - side) / 2, (bmp.height - side) / 2, side, side, 0, 0, 128, 128)
+  return c.toDataURL('image/jpeg', 0.85)
 }

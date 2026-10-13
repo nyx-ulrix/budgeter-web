@@ -15,6 +15,8 @@ import {
   SearchPicker, Small, Window, Side } from '../ui/components'
 import { Screen, useNav } from '../ui/nav'
 import { Px, Type } from '../ui/theme'
+import { addTx, useDate } from '../date/client'
+const DATE = 'date' // Count toward: the shared date budget
 
 type ExpenseRoute = Extract<Screen, { kind: 'expense' }>
 
@@ -121,6 +123,7 @@ function draftFrom(st: AppState, s: ExpenseRoute): Draft {
 }
 
 export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
+  const dateReady = useDate().phase === 'ready'
   const st = useAppState()
   const nav = useNav()
   const home = currency(st)
@@ -204,6 +207,11 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
   }
 
   function save() {
+    if (d.tripId === DATE) { // the shared date fund, not my budget
+      addTx({ kind: 'expense', amount: totalHome, note: (d.merchant.trim() || d.note.trim() || 'Date').slice(0, 100), date: d.date })
+        .then(() => nav.back()).catch((e) => alert(e.message))
+      return
+    }
     const t: Txn = {
       id: existing?.id ?? newId(),
       date: d.date,
@@ -315,19 +323,20 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
         </Window>
 
         <Side>
-        {st.trips.length > 0 && (
+        {(st.trips.length > 0 || dateReady) && (
           <Window title="Count toward">
-            <Choice<string | null> options={[null, ...trips.map((t) => t.id)]} selected={d.tripId}
-              label={(id) => (id == null ? 'Monthly budget' : 'Trip: ' + (trips.find((t) => t.id === id)?.name ?? ''))}
+            <Choice<string | null> options={[null, ...trips.map((t) => t.id), ...(dateReady && !existing ? [DATE] : [])]} selected={d.tripId}
+              label={(id) => (id == null ? 'Monthly budget' : id === DATE ? 'Date budget' : 'Trip: ' + (trips.find((t) => t.id === id)?.name ?? ''))}
               onSelect={(id) => {
                 const t = trips.find((x) => x.id === id)
                 set({ tripId: id, ...(t ? { paidCur: t.currency } : {}) })
               }} />
-            {d.tripId != null && <Small>Comes out of the trip fund, not your daily budget.</Small>}
+            {d.tripId === DATE ? <Small>Goes to the shared date budget (your partner sees it), not your daily budget.</Small>
+              : d.tripId != null && <Small>Comes out of the trip fund, not your daily budget.</Small>}
           </Window>
         )}
 
-        <Window title="Split">
+        {d.tripId !== DATE && <Window title="Split">
           <Label>Split between</Label>
           <Choice options={[1, 2, 3, 4, 5, 6, 7, 8]} selected={d.people} label={(n) => (n === 1 ? 'Just me' : `${n} people`)}
             onSelect={(n) => set({ people: n, ...(Array.from({ length: n }, (_, i) => personId(i + 1)).includes(d.payer) ? {} : { payer: ME }) })} />
@@ -365,7 +374,7 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
               )}
             </>
           )}
-        </Window>
+        </Window>}
 
         {s.ocrText != null && (
           <FoldWindow title="Scanned text">

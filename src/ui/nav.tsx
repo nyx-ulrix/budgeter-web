@@ -12,6 +12,7 @@ export type Screen =
   | { kind: 'sync' }
   | { kind: 'editSetup' }
   | { kind: 'credits' }
+  | { kind: 'date' }
 
 export interface Nav {
   tab: Tab

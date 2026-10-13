@@ -18,6 +18,8 @@ import { ExpenseScreen } from './src/screens/ExpenseScreen'
 import { PlannedScreen } from './src/screens/PlannedScreen'
 import { TripScreen } from './src/screens/TripScreen'
 import { SetupScreen } from './src/screens/SetupScreen'
+import { DateScreen } from './src/screens/DateScreen'
+import { resume as resumeDate } from './src/date/client'
 
 const TABS: { tab: Tab; label: string; glyph: string[] }[] = [
   { tab: 'home', label: 'Home', glyph: Glyphs.home },
@@ -34,6 +36,7 @@ export default function App() {
   useEffect(() => {
     startSync()
     preloadGoogle()
+    resumeDate()
     finishOpenRouter().then((msg) => msg && alert(msg))
   }, [])
   if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: Px.cream, alignItems: 'center', justifyContent: 'center' }}><ActivityIndicator color={Px.orange} /></View>
@@ -91,6 +94,7 @@ function Root() {
       case 'sync': return <SyncScreen />
       case 'editSetup': return <SetupScreen existing={st.setup} />
       case 'credits': return <CreditsScreen />
+      case 'date': return <DateScreen />
     }
   }
 }

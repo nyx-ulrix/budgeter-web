@@ -12,6 +12,7 @@ import { useNav } from '../ui/nav'
 import { Glyphs, Px, Type } from '../ui/theme'
 import { PlannedRow, ReserveDialog } from './BudgetScreen'
 import { TxnRow } from './TxnsScreen'
+import { useDate } from '../date/client'
 
 export const paceColor = (p: Pace): string => (p === 'ON_TRACK' ? Px.green : p === 'SLIGHTLY_OVER' ? Px.orange : Px.red)
 
@@ -21,6 +22,7 @@ export const dayColor = (d: Day): string => (d.remaining < 0 ? Px.red : d.dailyL
 export const paceSymbol = (p: Pace): string => (p === 'ON_TRACK' ? '●' : p === 'SLIGHTLY_OVER' ? '▲' : '✖')
 
 export function HomeScreen() {
+  const ds = useDate()
   const st = useAppState()
   const nav = useNav()
   const scanner = useScanner()
@@ -89,6 +91,13 @@ export function HomeScreen() {
           </View>
           <Small>Trip spending doesn't touch your daily budget.</Small>
           <PixelButton text="Open trip" onPress={() => nav.go({ kind: 'trip', id: trip.id })} kind="secondary" style={{ alignSelf: 'flex-start' }} />
+        </FoldWindow>
+      )}
+
+      {ds.phase === 'ready' && (
+        <FoldWindow title="Date budget">
+          <Body color={ds.left < 0 ? Px.red : Px.brown}>{money(ds.left, cur)} left to spend on dates</Body>
+          <PixelButton text="Open date budget" onPress={() => nav.go({ kind: 'date' })} kind="secondary" style={{ alignSelf: 'flex-start' }} />
         </FoldWindow>
       )}
 

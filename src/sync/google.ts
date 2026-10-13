@@ -14,7 +14,7 @@ declare const google: any
 let token: { value: string; expires: number } | null = null
 let loading: Promise<void> | null = null
 
-function loadGis(): Promise<void> {
+export function loadGis(): Promise<void> {
   if (typeof google !== 'undefined' && google.accounts?.oauth2) return Promise.resolve()
   return (loading ??= new Promise((resolve, reject) => {
     const s = document.createElement('script')

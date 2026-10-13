@@ -26,6 +26,9 @@ const TABS: { tab: Tab; label: string; glyph: string[] }[] = [
   { tab: 'profile', label: 'Profile', glyph: Glyphs.person },
 ]
 
+// Google sign-in only works from the registered address, so the Firebase default addresses forward to it.
+if (/\.(web\.app|firebaseapp\.com)$/.test(location.hostname)) location.replace('https://app.budgeter.liewjiaen.com' + location.pathname + location.search + location.hash)
+
 export default function App() {
   const [fontsLoaded] = useFonts(Fonts)
   useEffect(() => {

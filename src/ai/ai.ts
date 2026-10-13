@@ -90,8 +90,9 @@ async function http(method: string, url: string, key: string, p: Provider, body?
   const text = await r.text()
   if (!r.ok) {
     let msg = text.slice(0, 200)
-    try { const e = JSON.parse(text).error; msg = typeof e === 'string' ? e : e?.message ?? msg } catch { /* not JSON */ }
-    const s = r.status
+    try { const j = JSON.parse(text); const e = (Array.isArray(j) ? j[0] : j)?.error; msg = typeof e === 'string' ? e : e?.message ?? msg } catch { /* not JSON */ }
+    // Gemini reports a bad key as 400 "API key not valid" / "pass a valid API key".
+    const s = r.status === 400 && /api key/i.test(msg) ? 401 : r.status
     throw new Error(
       s === 401 || s === 403 ? `${p.label} rejected the key. Check it in Profile → AI. (${msg})`
         : s === 402 ? `${p.label} account is out of credit. (${msg})`

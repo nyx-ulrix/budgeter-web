@@ -13,14 +13,29 @@ const FDC_KEY = 'DEMO_KEY'
 /** USDA nutrient ids per macro (energy: kcal, Atwater general, Atwater specific). Sodium comes in mg. */
 const IDS: Record<string, number[]> = { calories: [1008, 2047, 2048], protein: [1003], carbs: [1005], fat: [1004], fibre: [1079], sugar: [2000, 1063], sodium: [1093] }
 
-/** One database match: macros per 100 g, and a serving size in grams when the label gives one. */
-export interface FoodHit { name: string; per100: Record<string, number>; serving?: number }
+/** One database match: macros per 100 g, and one portion (the label's serving, or the database's first household measure). */
+export interface FoodHit { name: string; per100: Record<string, number>; portion?: { grams: number; label: string } }
+
+/** Units for how much was eaten, portion first. ml counts as grams (close enough for drinks). */
+export const UNITS: [string, string][] = [['portion', 'Portion'], ['g', 'Grams (g)'], ['ml', 'Millilitres (ml)'], ['oz', 'Ounces (oz)'], ['cup', 'Cups'], ['tbsp', 'Tablespoons'], ['tsp', 'Teaspoons']]
+const GRAMS: Record<string, number> = { g: 1, ml: 1, oz: 28.35, cup: 240, tbsp: 15, tsp: 5 }
+
+/** Grams in [amount] [unit] of [hit]; a portion with no size given counts as 100 g. */
+export const gramsOf = (amount: number, unit: string, hit: FoodHit): number =>
+  amount * (unit === 'portion' ? hit.portion?.grams ?? 100 : GRAMS[unit] ?? 1)
 
 const round1 = (v: number) => Math.round(v * 10) / 10
 
 /** [per100] scaled to [grams], to one decimal. */
 export const scaleMacros = (per100: Record<string, number>, grams: number): Record<string, number> =>
   Object.fromEntries(Object.entries(per100).map(([k, v]) => [k, round1((v * grams) / 100)]))
+
+function portionOf(f: any): FoodHit['portion'] {
+  const unit = String(f.servingSizeUnit ?? '').toLowerCase()
+  if ((unit === 'g' || unit === 'ml') && f.servingSize > 0) return { grams: round1(f.servingSize), label: `1 serving (${round1(f.servingSize)} ${unit})` }
+  const m = (f.foodMeasures ?? []).find((x: any) => x.gramWeight > 0 && x.disseminationText && !/not specified/i.test(x.disseminationText))
+  return m ? { grams: round1(m.gramWeight), label: `${m.disseminationText} (${round1(m.gramWeight)} g)` } : undefined
+}
 
 /** Reads one search result (exported for the test). */
 export function readHit(f: any): FoodHit | null {
@@ -35,7 +50,7 @@ export function readHit(f: any): FoodHit | null {
   return {
     name: (/[a-z]/.test(name) ? name : name.charAt(0) + name.slice(1).toLowerCase()) + (brand ? ` · ${brand}` : ''),
     per100,
-    serving: String(f.servingSizeUnit ?? '').toLowerCase() === 'g' && f.servingSize > 0 ? round1(f.servingSize) : undefined,
+    portion: portionOf(f),
   }
 }
 

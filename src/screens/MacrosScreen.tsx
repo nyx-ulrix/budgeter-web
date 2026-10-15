@@ -3,12 +3,12 @@ import { Pressable, Text, View } from 'react-native'
 import { todayIso } from '../core/budget'
 import { MACROS, fmtMacro, macro, macroReport, sumMacros } from '../core/macros'
 import { Ai } from '../ai/ai'
-import { FoodHit, aiMacros, lookupFood, scaleMacros } from '../ai/food'
+import { FoodHit, UNITS, aiMacros, gramsOf, lookupFood, scaleMacros } from '../ai/food'
 import { money } from '../core/money'
 import { currency, macroTarget, macrosOn, mealsOn, unloggedFood } from '../data/ledger'
 import { AppState, FoodPreset, Meal, Txn, myShare, newId } from '../data/state'
 import { store, useAppState } from '../data/store'
-import { Body, Choice, CloseButton, DateField, FoldWindow, KeyValue, Label, Page, PixelButton, PixelDialog, PixelField, PixelProgress, Rule, Side, Small, Window } from '../ui/components'
+import { Body, Choice, CloseButton, DateField, Dropdown, FoldWindow, KeyValue, Label, Page, PixelButton, PixelDialog, PixelField, PixelProgress, Rule, Side, Small, Window } from '../ui/components'
 import { useNav } from '../ui/nav'
 import { Glyphs, Px, Type } from '../ui/theme'
 import { Toggles } from './ExpenseScreen'
@@ -181,7 +181,8 @@ function MealDialog({ st, meal, onDone }: { st: AppState; meal: Meal; onDone: ()
   const [values, setValues] = useState<Record<string, string>>(() => toText(meal.macros))
   const [all, setAll] = useState(false)
   const [query, setQuery] = useState('')
-  const [grams, setGrams] = useState('100')
+  const [amount, setAmount] = useState('1')
+  const [unit, setUnit] = useState('portion')
   const [hits, setHits] = useState<FoodHit[] | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const [note, setNote] = useState<string | null>(null)
@@ -189,7 +190,7 @@ function MealDialog({ st, meal, onDone }: { st: AppState; meal: Meal; onDone: ()
   const ai = Ai.active()
   const shown = all ? MACROS.map((m) => m.key) : st.macros.tracked
   const bad = Object.keys(values).filter((k) => (values[k] ?? '').trim() !== '' && num(values[k]) == null)
-  const g = num(grams)
+  const n = num(amount)
   const run = (what: string, f: () => Promise<void>) => { setBusy(what); setErr(null); setNote(null); f().catch((e) => setErr(e.message)).finally(() => setBusy(null)) }
   return (
     <PixelDialog title={saved ? 'Edit food' : 'Add food'} onDismiss={onDone}>
@@ -208,18 +209,30 @@ function MealDialog({ st, meal, onDone }: { st: AppState; meal: Meal; onDone: ()
       <Rule />
       <Label>Look up (free food database)</Label>
       <PixelField value={query} onChange={setQuery} label="" placeholder={name.trim() || 'Whey protein, flat white, rice'} />
-      <PixelField value={grams} onChange={setGrams} label="Grams eaten" keyboard="decimal-pad" error={g == null || g <= 0 ? 'Enter grams' : null} />
+      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+        <PixelField value={amount} onChange={setAmount} label="Amount eaten" keyboard="decimal-pad" error={n == null || n <= 0 ? 'Enter an amount' : null} style={{ flex: 1 }} />
+        <View style={{ flex: 1.4 }}>
+          <Dropdown label="Unit" value={unit} options={UNITS} onChange={(u) => {
+            // Keep the amount sensible when switching between a count and a weight.
+            const weight = (x: string) => x === 'g' || x === 'ml'
+            if (weight(u) && !weight(unit) && amount.trim() === '1') setAmount('100')
+            if (!weight(u) && weight(unit) && amount.trim() === '100') setAmount('1')
+            setUnit(u)
+          }} />
+        </View>
+      </View>
       <PixelButton text={busy === 'look' ? 'Looking up…' : 'Look up'} kind="secondary" enabled={!busy && !!(query.trim() || name.trim())}
         onPress={() => run('look', async () => setHits(await lookupFood(query.trim() || name.trim())))} />
       {hits?.length === 0 && <Small>No matches. Try other words, or fill with AI.</Small>}
       {hits?.map((h, i) => (
         <Pressable key={i} role="button" aria-label={`Add ${h.name}`} style={{ gap: 2, minHeight: 44, paddingVertical: 4 }} onPress={() => {
-          setValues((x) => toText(sumMacros([numbers(x), scaleMacros(h.per100, g ?? 100)])))
+          const grams = gramsOf(n ?? 1, unit, h)
+          setValues((x) => toText(sumMacros([numbers(x), scaleMacros(h.per100, grams)])))
           if (!name.trim()) setName(h.name.split(' · ')[0])
-          setNote(`Added ${fmtMacro(g ?? 100)} g of ${h.name}. Tap more to add ingredients.`)
+          setNote(`Added ${fmtMacro(n ?? 1)} ${unit}${unit === 'g' ? '' : ` (${fmtMacro(grams)} g)`} of ${h.name}. Tap more to add ingredients.`)
         }}>
           <Body>{h.name}</Body>
-          <Small>{`per 100 g: ${summary(st, h.per100)}${h.serving ? ` · serving ${fmtMacro(h.serving)} g` : ''}`}</Small>
+          <Small>{`per 100 g: ${summary(st, h.per100)} · portion: ${h.portion?.label ?? '100 g (none listed)'}`}</Small>
         </Pressable>
       ))}
       {ai

@@ -193,6 +193,19 @@ export function DateField({ label, value, onChange }: { label: string; value: st
   )
 }
 
+/** Native dropdown in the field style. [options] are (value, label). */
+export function Dropdown({ label, value, options, onChange }: { label: string; value: string; options: [string, string][]; onChange: (v: string) => void }) {
+  return (
+    <View style={{ gap: 4 }}>
+      {!!label && <Label>{label}</Label>}
+      {createElement('select', {
+        value, 'aria-label': label || undefined, onChange: (e: any) => onChange(e.target.value),
+        style: { fontFamily: 'VT323', fontSize: 21, color: Px.brown, background: Px.creamLight, border: `3px solid ${Px.brown}`, height: 48, padding: '6px 8px', boxSizing: 'border-box', width: '100%' },
+      }, options.map(([v, l]) => createElement('option', { key: v, value: v }, l)))}
+    </View>
+  )
+}
+
 export function CloseButton({ onPress }: { onPress: () => void }) {
   return (
     <Pressable onPress={onPress} role="button" aria-label="Close" style={{ width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>

@@ -14,6 +14,7 @@ import { PlannedRow, ReserveDialog } from './BudgetScreen'
 import { TxnRow } from './TxnsScreen'
 import { useDate } from '../date/client'
 import { monthLeft } from './DateScreen'
+import { AddFoodButton, MacrosCard } from './MacrosScreen'
 
 export const paceColor = (p: Pace): string => (p === 'ON_TRACK' ? Px.green : p === 'SLIGHTLY_OVER' ? Px.orange : Px.red)
 
@@ -82,7 +83,10 @@ export function HomeScreen() {
       <View style={{ flexDirection: 'row', gap: 10 }}>
         <PixelButton text="Expense" onPress={() => nav.go({ kind: 'expense' })} glyph={Glyphs.plus} style={{ flex: 1 }} />
         <PixelButton text="Scan" onPress={scanner.camera} glyph={Glyphs.camera} style={{ flex: 1 }} />
+        <AddFoodButton style={{ flex: 1 }} />
       </View>
+
+      <MacrosCard />
 
       {/* Secondary, folded (a side column on wide screens). */}
       <Side>

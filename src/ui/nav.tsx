@@ -1,7 +1,7 @@
 import React, { createContext, ReactNode, useContext, useEffect, useMemo, useState } from 'react'
 import type { ParsedReceipt } from '../core/receipt'
 
-export type Tab = 'home' | 'txns' | 'budget' | 'profile'
+export type Tab = 'home' | 'txns' | 'budget' | 'macros' | 'profile'
 
 /** Screens pushed over the tabs. */
 export type Screen =

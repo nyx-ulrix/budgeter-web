@@ -14,6 +14,7 @@ import { HomeScreen } from './src/screens/HomeScreen'
 import { TxnsScreen } from './src/screens/TxnsScreen'
 import { BudgetScreen } from './src/screens/BudgetScreen'
 import { ProfileScreen, AiScreen, SyncScreen, CreditsScreen } from './src/screens/ProfileScreen'
+import { MacrosScreen } from './src/screens/MacrosScreen'
 import { ExpenseScreen } from './src/screens/ExpenseScreen'
 import { PlannedScreen } from './src/screens/PlannedScreen'
 import { TripScreen } from './src/screens/TripScreen'
@@ -24,6 +25,7 @@ const TABS: { tab: Tab; label: string; glyph: string[] }[] = [
   { tab: 'home', label: 'Home', glyph: Glyphs.home },
   { tab: 'txns', label: 'Txns', glyph: Glyphs.list },
   { tab: 'budget', label: 'Budget', glyph: Glyphs.coin },
+  { tab: 'macros', label: 'Macros', glyph: Glyphs.apple },
   { tab: 'profile', label: 'Profile', glyph: Glyphs.person },
 ]
 
@@ -82,6 +84,7 @@ function Root() {
         case 'home': return <HomeScreen />
         case 'txns': return <TxnsScreen />
         case 'budget': return <BudgetScreen />
+        case 'macros': return <MacrosScreen />
         case 'profile': return <ProfileScreen />
       }
     }

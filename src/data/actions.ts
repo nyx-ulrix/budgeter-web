@@ -53,6 +53,7 @@ export function deleteTxn(s: AppState, id: string, now: number = Date.now()): Ap
   return {
     ...s,
     txns: s.txns.map((x) => (x.id !== id ? x : tombstone(s, x, now))).filter(notNull),
+    meals: s.meals.filter((m) => m.txnId !== id), // the meal logged for it goes too
     planned: [...s.planned.map((p) => (pid != null && p.id === pid ? { ...p, status: 'OPEN' as const } : p)), ...back],
   }
 }

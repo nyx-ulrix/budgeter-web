@@ -63,6 +63,7 @@ tabs.set('_sync', [
   ['categories', '1', JSON.stringify({ categories: ['Food', 'Bills'], monthlyCategories: ['Bills'] })],
   ['plan:2026-10', '1', JSON.stringify({ income: 310000, lines: [], caps: {}, savingsTarget: 0 })],
   ['txn:a', '1', phoneTxn(790, 100)],
+  ['macros', '1', JSON.stringify({ tracked: ['calories', 'protein'], targets: {} })],
 ])
 tabs.set('2026-10', [['ID'], ['a', '2026-10-02']])
 

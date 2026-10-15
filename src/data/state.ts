@@ -1,4 +1,5 @@
 import { SplitMethod } from '../core/split'
+import { DEFAULT_TRACKED } from '../core/macros'
 
 /*
  * Types mirror the Android app's State.kt field for field, so both apps read each other's JSON.
@@ -23,6 +24,9 @@ export interface AppState {
   txns: Txn[]
   planned: Planned[]
   trips: Trip[]
+  meals: Meal[]
+  macros: MacroGoals
+  presets: FoodPreset[]
   categories: string[]
   // Categories spread over the month (groceries, bills): they lower the month's money, and so every remaining
   // day's budget, but don't use up today's budget. A set.
@@ -111,6 +115,27 @@ export interface Txn {
   syncedTab?: string // sheet tab the row was written to
   deleted: boolean // kept until the delete reaches Sheets
 }
+
+/**
+ * Something I ate, with its macros (calories, protein... keyed as in core/macros.ts). [txnId] links it to the
+ * Food expense it came from; free food has none. A Food expense with no meal yet waits in the Macros tab.
+ */
+export interface Meal {
+  id: string
+  date: string
+  name: string
+  txnId?: string
+  macros: Record<string, number>
+}
+
+/** Something I eat often (protein powder, morning coffee, my own recipe), to add in one tap. */
+export interface FoodPreset { id: string; name: string; macros: Record<string, number> }
+
+/** Which macros I track (shown on the Macros tab and Home) and my daily targets (missing = default). */
+export interface MacroGoals { tracked: string[]; targets: Record<string, number> }
+
+/** Category whose expenses are meals (groceries aren't). */
+export const MEAL_CATEGORY = 'Food'
 
 export type PlannedStatus = 'OPEN' | 'BOUGHT'
 
@@ -246,6 +271,14 @@ export const normTrip = (o: Loose<Trip>): Trip => ({
   monthly: o.monthly ?? 0, monthlyFrom: opt(o.monthlyFrom),
 })
 
+export const normMeal = (o: Loose<Meal>): Meal => ({
+  id: o.id ?? newId(), date: o.date ?? '', name: o.name ?? '', txnId: opt(o.txnId), macros: rec(o.macros),
+})
+
+export const normPreset = (o: Loose<FoodPreset>): FoodPreset => ({ id: o.id ?? newId(), name: o.name ?? '', macros: rec(o.macros) })
+
+export const normMacros = (o: Loose<MacroGoals> = {}): MacroGoals => ({ tracked: [...(o.tracked ?? DEFAULT_TRACKED)], targets: rec(o.targets) })
+
 export const normSync = (o: Loose<SyncInfo> = {}): SyncInfo => ({
   enabled: o.enabled ?? false, account: opt(o.account), spreadsheetId: opt(o.spreadsheetId),
   paused: opt(o.paused), lastSync: opt(o.lastSync),
@@ -257,6 +290,9 @@ export const normState = (o: Loose<AppState> = {}): AppState => ({
   txns: (o.txns ?? []).map(normTxn),
   planned: (o.planned ?? []).map(normPlanned),
   trips: (o.trips ?? []).map(normTrip),
+  meals: (o.meals ?? []).map(normMeal),
+  macros: normMacros(o.macros ?? {}),
+  presets: (o.presets ?? []).map(normPreset),
   categories: [...(o.categories ?? DEFAULT_CATEGORIES)],
   monthlyCategories: set(o.monthlyCategories ?? DEFAULT_MONTHLY),
   sync: normSync(o.sync ?? {}),

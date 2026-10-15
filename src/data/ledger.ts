@@ -3,7 +3,8 @@ import {
   periodOfKey, today, todayIso,
 } from '../core/budget'
 import { allocate } from '../core/money'
-import { AppState, LINE_KINDS, LineKind, Plan, Trip, Txn, budgetImpact, myShare, normPlan, tripTarget } from './state'
+import { AppState, LINE_KINDS, LineKind, MEAL_CATEGORY, Meal, Plan, Trip, Txn, budgetImpact, myShare, normPlan, tripTarget } from './state'
+import { macro, sumMacros } from '../core/macros'
 
 /** Derived numbers. Pure functions of AppState, so screens and widgets agree. */
 
@@ -218,3 +219,12 @@ export const tripSpent = (s: AppState, tripId: string): number => sum(liveTxns(s
 
 export const activeTrip = (s: AppState, date: string = todayIso()): Trip | undefined =>
   s.trips.find((t) => date >= t.start && date <= t.end)
+
+// Macros
+
+export const macroTarget = (s: AppState, key: string): number => s.macros.targets[key] ?? macro(key).default
+export const mealsOn = (s: AppState, day: string): Meal[] => s.meals.filter((m) => m.date === day)
+export const macrosOn = (s: AppState, day: string): Record<string, number> => sumMacros(mealsOn(s, day).map((m) => m.macros))
+/** Food expenses (meals out, not groceries) on [day] that don't have a meal logged yet. */
+export const unloggedFood = (s: AppState, day: string): Txn[] =>
+  liveTxns(s).filter((t) => t.date === day && t.category === MEAL_CATEGORY && !s.meals.some((m) => m.txnId === t.id))

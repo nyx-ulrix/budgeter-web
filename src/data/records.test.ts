@@ -1,7 +1,10 @@
 /// <reference types="node" />
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { normState, normTxn } from './state'
+import { normMacros, normMeal, normState, normTxn } from './state'
+import { unloggedFood } from './ledger'
+import { deleteTxn } from './actions'
+import { fmtMacro, macroReport } from '../core/macros'
 import { encodeRecord, mergeRemote, Remote, stampedSince, toUpload, withRecord } from './records'
 
 const setup = { country: 'SG', currency: 'SGD', startDay: 1, name: '' }
@@ -60,4 +63,26 @@ test('reads and writes the same JSON as the Android app', () => {
   assert.equal(old.tripId, undefined)
   assert.equal(old.payer, 'me')
   assert.ok(!encodeRecord({ ...old, syncedAt: null } as object).includes('null'))
+})
+
+test('meals and macro goals sync, and deleting a Food expense drops its meal', () => {
+  const food = normTxn({ id: 'f', date: '2026-10-14', total: 650, category: 'Food' })
+  const st = normState({ txns: [food, normTxn({ id: 'g', date: '2026-10-14', total: 3000, category: 'Groceries' })] })
+  assert.deepEqual(unloggedFood(st, '2026-10-14').map((t) => t.id), ['f'])
+  const logged = { ...st, meals: [normMeal({ id: 'm', date: '2026-10-14', name: 'Chicken rice', txnId: 'f', macros: { calories: 600 } })], macros: normMacros({ tracked: ['calories', 'fat'] }) }
+  assert.deepEqual(unloggedFood(logged, '2026-10-14'), [])
+  const web = mergeRemote(normState({}), toUpload(logged, {}))
+  assert.deepEqual(web.meals, logged.meals)
+  assert.deepEqual(web.macros.tracked, ['calories', 'fat'])
+  assert.deepEqual(deleteTxn(logged, 'f').meals, [])
+  const { logged: days, stats } = macroReport({
+    '2026-10-14': [{ calories: 800, protein: 40 }, { calories: 900, protein: 70.5 }],
+    '2026-10-12': [{ calories: 2500, protein: 60 }],
+  }, ['calories', 'protein'], { calories: 2000, protein: 100 }, '2026-10-14', 7)
+  assert.deepEqual(days.map(([d]) => d), ['2026-10-14', '2026-10-12'])
+  assert.equal(stats[0].average, 2100)
+  assert.equal(stats[0].onTargetDays, 1)
+  assert.equal(stats[1].onTargetDays, 1)
+  assert.equal(fmtMacro(1820), '1,820')
+  assert.equal(fmtMacro(12.5), '12.5')
 })

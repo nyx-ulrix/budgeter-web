@@ -1,10 +1,10 @@
-import { AppState, normPlan, normPlanned, normSetup, normTrip, normTxn } from './state'
+import { AppState, normMacros, normMeal, normPreset, normPlan, normPlanned, normSetup, normTrip, normTxn } from './state'
 
 /*
  * Two-way sync between the Android and web apps, through a hidden "_sync" tab in the shared Google Sheet.
  * The state is split into records, each with the time it last changed ("stamp"). On each sync both sides keep
  * whichever copy of a record is newer. A deleted record keeps its stamp with no data, so the delete wins too.
- * Keys: setup, categories, plan:<period>, txn:<id>, planned:<id>, trip:<id>. The Android app (Records.kt) uses
+ * Keys: setup, categories, macros, plan:<period>, txn:<id>, planned:<id>, trip:<id>, meal:<id>, preset:<id>. The Android app (Records.kt) uses
  * exactly the same keys and JSON.
  * ponytail: last writer wins per record by wall clock; two devices editing the same record within one sync
  * interval keep only the later edit.
@@ -24,6 +24,9 @@ export function recordObjects(s: AppState): Record<string, object> {
   for (const t of s.txns) out[`txn:${t.id}`] = t
   for (const p of s.planned) out[`planned:${p.id}`] = p
   for (const t of s.trips) out[`trip:${t.id}`] = t
+  out.macros = s.macros
+  for (const m of s.meals) out[`meal:${m.id}`] = m
+  for (const p of s.presets) out[`preset:${p.id}`] = p
   return out
 }
 
@@ -72,6 +75,9 @@ export function withRecord(s: AppState, key: string, json: string | null): AppSt
     case 'txn': return { ...s, txns: put(s.txns, o && normTxn(o)) }
     case 'planned': return { ...s, planned: put(s.planned, o && normPlanned(o)) }
     case 'trip': return { ...s, trips: put(s.trips, o && normTrip(o)) }
+    case 'macros': return o ? { ...s, macros: normMacros(o) } : s
+    case 'meal': return { ...s, meals: put(s.meals, o && normMeal(o)) }
+    case 'preset': return { ...s, presets: put(s.presets, o && normPreset(o)) }
     default: return s
   }
 }

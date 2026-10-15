@@ -171,10 +171,10 @@ function TargetField({ st, k }: { st: AppState; k: string }) {
 }
 
 /**
- * One meal: name, day and macros. Macros can come from a preset, the free food database (each result adds on,
- * so a recipe is built ingredient by ingredient), the AI provider, or be typed in from a label.
+ * One meal: name, day and macros. Macros can come from a preset, an AI look up (each match adds on, so a recipe is
+ * built ingredient by ingredient), an AI estimate of the whole name, or be typed in from a label.
  */
-function MealDialog({ st, meal, onDone }: { st: AppState; meal: Meal; onDone: () => void }) {
+export function MealDialog({ st, meal, onDone }: { st: AppState; meal: Meal; onDone: () => void }) {
   const saved = st.meals.some((m) => m.id === meal.id)
   const [name, setName] = useState(meal.name)
   const [date, setDate] = useState(meal.date)
@@ -207,39 +207,39 @@ function MealDialog({ st, meal, onDone }: { st: AppState; meal: Meal; onDone: ()
       ))}
       <PixelButton text={all ? 'Only what I track' : 'All nutrients'} kind="secondary" onPress={() => setAll(!all)} />
       <Rule />
-      <Label>Look up (free food database)</Label>
-      <PixelField value={query} onChange={setQuery} label="" placeholder={name.trim() || 'Whey protein, flat white, rice'} />
-      <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
-        <PixelField value={amount} onChange={setAmount} label="Amount eaten" keyboard="decimal-pad" error={n == null || n <= 0 ? 'Enter an amount' : null} style={{ flex: 1 }} />
-        <View style={{ flex: 1.4 }}>
-          <Dropdown label="Unit" value={unit} options={UNITS} onChange={(u) => {
-            // Keep the amount sensible when switching between a count and a weight.
-            const weight = (x: string) => x === 'g' || x === 'ml'
-            if (weight(u) && !weight(unit) && amount.trim() === '1') setAmount('100')
-            if (!weight(u) && weight(unit) && amount.trim() === '100') setAmount('1')
-            setUnit(u)
-          }} />
+      {!ai ? <Small>Set up AI in Profile (the same one that reads receipts) to look up macros.</Small> : <>
+        <Label>{`Look up with AI (${ai.label})`}</Label>
+        <PixelField value={query} onChange={setQuery} label="" placeholder={name.trim() || 'Whey protein, flat white, rice'} />
+        <View style={{ flexDirection: 'row', gap: 8, alignItems: 'flex-start' }}>
+          <PixelField value={amount} onChange={setAmount} label="Amount eaten" keyboard="decimal-pad" error={n == null || n <= 0 ? 'Enter an amount' : null} style={{ flex: 1 }} />
+          <View style={{ flex: 1.4 }}>
+            <Dropdown label="Unit" value={unit} options={UNITS} onChange={(u) => {
+              // Keep the amount sensible when switching between a count and a weight.
+              const weight = (x: string) => x === 'g' || x === 'ml'
+              if (weight(u) && !weight(unit) && amount.trim() === '1') setAmount('100')
+              if (!weight(u) && weight(unit) && amount.trim() === '100') setAmount('1')
+              setUnit(u)
+            }} />
+          </View>
         </View>
-      </View>
-      <PixelButton text={busy === 'look' ? 'Looking up…' : 'Look up'} kind="secondary" enabled={!busy && !!(query.trim() || name.trim())}
-        onPress={() => run('look', async () => setHits(await lookupFood(query.trim() || name.trim())))} />
-      {hits?.length === 0 && <Small>No matches. Try other words, or fill with AI.</Small>}
-      {hits?.map((h, i) => (
-        <Pressable key={i} role="button" aria-label={`Add ${h.name}`} style={{ gap: 2, minHeight: 44, paddingVertical: 4 }} onPress={() => {
-          const grams = gramsOf(n ?? 1, unit, h)
-          setValues((x) => toText(sumMacros([numbers(x), scaleMacros(h.per100, grams)])))
-          if (!name.trim()) setName(h.name.split(' · ')[0])
-          setNote(`Added ${fmtMacro(n ?? 1)} ${unit}${unit === 'g' ? '' : ` (${fmtMacro(grams)} g)`} of ${h.name}. Tap more to add ingredients.`)
-        }}>
-          <Body>{h.name}</Body>
-          <Small>{`per 100 g: ${summary(st, h.per100)} · portion: ${h.portion?.label ?? '100 g (none listed)'}`}</Small>
-        </Pressable>
-      ))}
-      {ai
-        ? <PixelButton text={busy === 'ai' ? 'Asking AI…' : `Fill with AI (${ai.label})`} kind="secondary" enabled={!busy && !!name.trim()}
+        <PixelButton text={busy === 'look' ? 'Looking up…' : 'Look up'} kind="secondary" enabled={!busy && !!(query.trim() || name.trim())}
+          onPress={() => run('look', async () => setHits(await lookupFood(ai, query.trim() || name.trim())))} />
+        {hits?.length === 0 && <Small>No matches. Try other words.</Small>}
+        {hits?.map((h, i) => (
+          <Pressable key={i} role="button" aria-label={`Add ${h.name}`} style={{ gap: 2, minHeight: 44, paddingVertical: 4 }} onPress={() => {
+            const grams = gramsOf(n ?? 1, unit, h)
+            setValues((x) => toText(sumMacros([numbers(x), scaleMacros(h.per100, grams)])))
+            if (!name.trim()) setName(h.name)
+            setNote(`Added ${fmtMacro(n ?? 1)} ${unit}${unit === 'g' ? '' : ` (${fmtMacro(grams)} g)`} of ${h.name}. Tap more to add ingredients.`)
+          }}>
+            <Body>{h.name}</Body>
+            <Small>{`per 100 g: ${summary(st, h.per100)} · portion: ${h.portion?.label ?? '100 g (none given)'}`}</Small>
+          </Pressable>
+        ))}
+        <PixelButton text={busy === 'ai' ? 'Asking AI…' : 'Fill all from the name'} kind="secondary" enabled={!busy && !!name.trim()}
           onPress={() => run('ai', async () => { setValues(toText(await aiMacros(ai, name.trim()))); setNote('Filled by AI: check the numbers.') })} />
-        : <Small>Set up AI in Profile to fill macros from a description.</Small>}
-      <Small>The lookup is free. AI uses your provider and may cost a little; put amounts in the name (e.g. "2 eggs and toast").</Small>
+        <Small>Look up adds a matching food per amount (tap several to build a recipe). Fill all estimates the whole name, e.g. "2 eggs and toast". Each uses one AI request.</Small>
+      </>}
       {note && <Small color={Px.green}>{note}</Small>}
       {err && <Small color={Px.red}>! {err}</Small>}
       <Rule />

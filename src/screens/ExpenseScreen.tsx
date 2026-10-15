@@ -8,13 +8,14 @@ import { SPLIT_LABEL, SPLIT_METHODS, SplitMethod, itemShares, split } from '../c
 import { deleteTxn, saveTxn } from '../data/actions'
 import { activeTrip, currency } from '../data/ledger'
 import { rate as fetchRate } from '../data/rates'
-import { AppState, ME, Txn, newId, personId, personLabel } from '../data/state'
+import { AppState, ME, MEAL_CATEGORY, Meal, Txn, newId, personId, personLabel } from '../data/state'
+import { MealDialog } from './MacrosScreen'
 import { store, useAppState } from '../data/store'
 import {
   Body, Chip, Choice, CloseButton, DateField, FoldWindow, KeyValue, Label, Page, PageHeader, PixelButton, PixelField, Rule,
   SearchPicker, Small, Window, Side } from '../ui/components'
 import { Screen, useNav } from '../ui/nav'
-import { Px, Type } from '../ui/theme'
+import { Glyphs, Px, Type } from '../ui/theme'
 import { addTx, deleteTx, updateTx, useDate } from '../date/client'
 import type { Tx as DateTx } from '../date/money'
 const DATE = 'date' // Count toward: the shared date budget
@@ -212,7 +213,10 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
     }
   }
 
-  function save() {
+  const [mealFor, setMealFor] = useState<Meal | null>(null) // "Save & add to macros": the meal to fill in after saving
+
+  /** Saves; then [then] gets the saved expense's id (by default, go back). */
+  function save(then: (id: string) => void = () => nav.back()) {
     if (d.tripId === DATE) { // the shared date fund, not my budget; moving a normal expense there takes it out of my budget
       const draft = { kind: 'expense' as const, amount: totalHome, note: (d.merchant.trim() || d.note.trim() || 'Date').slice(0, 100), date: d.date }
       ;(dateTx ? updateTx(dateTx.id, draft) : addTx(draft))
@@ -255,7 +259,7 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
       deleted: false,
     }
     store.update((x) => saveTxn(x, t))
-    nav.back()
+    then(t.id)
   }
 
   function reread(id: string | null) {
@@ -399,13 +403,22 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
         </Side>
 
         {errors.map((e, i) => <Text key={i} style={[Type.small, { color: Px.red }]}>! {e}</Text>)}
-        <PixelButton text={editing ? 'Save changes' : 'Save expense'} onPress={save} enabled={errors.length === 0} />
+        <PixelButton text={editing ? 'Save changes' : 'Save expense'} onPress={() => save()} enabled={errors.length === 0} />
+        {/* A meal (Food, not groceries) can go straight to Macros: save, then fill in what was eaten. */}
+        {d.tripId !== DATE && (d.category === MEAL_CATEGORY || d.items.some((i) => i.category === MEAL_CATEGORY))
+          && !(existing && st.meals.some((m) => m.txnId === existing.id)) && (
+          <PixelButton text="Save & add to macros" kind="secondary" glyph={Glyphs.food} enabled={errors.length === 0} onPress={() => save((id) => {
+            const eaten = d.itemised ? d.items.filter((i) => !i.category || i.category === MEAL_CATEGORY).map((i) => i.name.trim()).filter(Boolean).join(', ') : ''
+            setMealFor({ id: newId(), date: d.date, name: eaten || d.merchant.trim(), txnId: id, macros: {} })
+          })} />
+        )}
         {existing && (
           <PixelButton text="Delete" kind="danger" onPress={() => { store.update((x) => deleteTxn(x, existing.id)); nav.back() }} />
         )}
         {dateTx && <PixelButton text="Delete" kind="danger" onPress={() => { deleteTx(dateTx.id).catch((e) => alert(e.message)); nav.back() }} />}
       </Page>
 
+      {mealFor && <MealDialog st={st} meal={mealFor} onDone={() => { setMealFor(null); nav.back() }} />}
       {pickingFor && (
         <SearchPicker title="Item category" options={st.categories.map((c) => [c, c])} onDismiss={() => setCatFor(null)}
           onPick={(c) => { setItem(pickingFor.key, { category: c }); setCatFor(null) }} />

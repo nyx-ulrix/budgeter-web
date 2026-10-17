@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native'
 import { Ai, parse } from '../ai/ai'
 import { todayIso, validDate } from '../core/budget'
 import { allocate, convert, money, parseMoney, plain } from '../core/money'
-import { ParsedReceipt, computedTotal, itemCosts, mismatch, parsedReceipt, receiptItem } from '../core/receipt'
+import { ParsedReceipt, computedTotal, itemCosts, mismatch, parsedReceipt, receiptDate, receiptItem } from '../core/receipt'
 import { SPLIT_LABEL, SPLIT_METHODS, SplitMethod, itemShares, split } from '../core/split'
 import { deleteTxn, saveTxn } from '../data/actions'
 import { activeTrip, currency } from '../data/ledger'
@@ -77,7 +77,7 @@ function loadReceipt(d: Draft, r: ParsedReceipt, fallbackCur: string): Draft {
     paidCur,
     merchant: r.merchant.trim() ? r.merchant : d.merchant,
     category: r.category ?? d.category,
-    date: isIsoDate(r.date) ? r.date : d.date,
+    date: isIsoDate(r.date) ? receiptDate(r.date, todayIso()) : d.date,
     items: r.items.map((i) => itemDraft(i.name, plain(i.price, paidCur), i.qty)),
     itemised,
     discount: p(r.discount), service: p(r.serviceCharge), tax: p(r.tax), taxIncluded: r.taxIncluded,

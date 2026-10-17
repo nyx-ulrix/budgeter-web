@@ -47,4 +47,4 @@ The logic in `src/core` and `src/data` is a line-by-line port of the Android app
 
 ## Keys
 
-`.env.local` (not committed) holds `EXPO_PUBLIC_DATEBUDGET_API_KEY`, DateBudget's Firebase web key, restricted in Google Cloud to the Budgeter and DateBudget sites. Get it from the DateBudget project's API keys ("DateBudget + Budgeter web").
+`.env.local` (not committed) holds `EXPO_PUBLIC_FIREBASE_API_KEY`, Budgeter's Firebase web key (project budgeter-510810, "Browser key (auto created by Firebase)"), restricted in Google Cloud to the Budgeter and DateBudget sites. The shared date budget lives in that project's Firestore, which the DateBudget site uses too.

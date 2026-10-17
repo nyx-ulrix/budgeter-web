@@ -1,4 +1,5 @@
 import { store } from '../data/store'
+import { signInWithGoogleToken } from '../date/client'
 
 /**
  * Google sign-in for Sheets with Google Identity Services (token model, no server). Same Cloud project and the
@@ -51,6 +52,7 @@ export async function requestToken(interactive: boolean, hint?: string | null): 
         fetch('https://www.googleapis.com/oauth2/v3/userinfo', { headers: { Authorization: `Bearer ${r.access_token}` } })
           .then((x) => x.json()).then((u) => u.email && store.update((s) => ({ ...s, sync: { ...s.sync, account: u.email } }), { notify: false }))
           .catch(() => {})
+        signInWithGoogleToken(r.access_token) // the same login also opens the shared date budget
         resolve({ token: r.access_token })
       },
       error_callback: (e: any) => reject(new Error(e?.type === 'popup_closed' ? 'Sign-in was closed.' : e?.message || 'Google sign-in failed.')),

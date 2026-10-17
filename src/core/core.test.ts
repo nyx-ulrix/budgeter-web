@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { allocate, convert, money, parseMoney, plain } from './money'
 import { daySpend, periodOf, periodOfKey, nextPeriod, today, pace } from './budget'
 import { split, itemShares } from './split'
-import { parsedReceipt, receiptItem, itemCosts, mismatch } from './receipt'
+import { parsedReceipt, receiptItem, itemCosts, mismatch, receiptDate } from './receipt'
 import { Seg, findDate, isSummary, joinRows, parse } from './receiptText'
 
 const sum = (xs: number[]) => xs.reduce((a, b) => a + b, 0)
@@ -228,4 +228,11 @@ test('finds dates', () => {
   assert.equal(findDate('6 Oct 2026'), '2026-10-06')
   assert.equal(findDate('12/31/26'), '2026-12-31') // impossible day-first, read month-first
   assert.equal(findDate('Table 12'), null)
+})
+
+test('scanned receipt year is kept recent', () => {
+  assert.equal(receiptDate('2023-10-16', '2026-10-17'), '2026-10-16') // misread year
+  assert.equal(receiptDate('2026-10-16', '2026-10-17'), '2026-10-16') // fine as is
+  assert.equal(receiptDate('2026-12-30', '2026-01-05'), '2025-12-30') // future: last year
+  assert.equal(receiptDate('2026-03-01', '2026-10-17'), '2026-10-17') // just old: today
 })

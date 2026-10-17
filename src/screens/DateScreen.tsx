@@ -32,7 +32,7 @@ function setMyShare(amount: number) {
   })
 }
 
-/** Google's own "Sign in with Google" button; hands back an ID token for DateBudget's sign-in. */
+/** Google's own "Sign in with Google" button; hands back an ID token for the date budget's sign-in. */
 function GoogleButton({ onToken }: { onToken: (idToken: string) => void }) {
   const box = useRef<HTMLDivElement | null>(null)
   const [err, setErr] = useState<string | null>(null)
@@ -129,7 +129,7 @@ function SignIn() {
   return (
     <Section title="Sign in">
       <Body>One shared fund for your dates, with your partner. It's the same budget as the DateBudget app, so either of you can use either app.</Body>
-      <Small>Sign in with the Google account you use for DateBudget.</Small>
+      <Small>This uses your Budgeter Google account: connecting Google sync signs you in here too. Or sign in just for this:</Small>
       <GoogleButton onToken={signIn} />
     </Section>
   )

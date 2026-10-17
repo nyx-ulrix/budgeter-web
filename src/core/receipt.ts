@@ -39,3 +39,19 @@ export function itemCosts(r: ParsedReceipt): number[] {
   const shares = allocate(charges(r), r.items.map((i) => Math.max(i.price, 0)))
   return r.items.map((item, i) => item.price + shares[i])
 }
+
+/**
+ * The date to use for a scanned receipt (ISO days). Receipts are scanned soon after paying, and a misread year (2023
+ * for 2026) would file the expense in a long-gone month, so a date more than [days] days old or in the future gets this
+ * year (last year if that's still ahead); if it's still out of range, today. Same as the Android receiptDate.
+ */
+export function receiptDate(read: string, today: string, days = 60): string {
+  const t = Date.parse(today + 'T00:00:00Z')
+  const ok = (d: string) => { const x = Date.parse(d + 'T00:00:00Z'); return x <= t && x >= t - days * 86_400_000 }
+  if (ok(read)) return read
+  const valid = (d: string) => new Date(d + 'T00:00:00Z').toISOString().slice(0, 10) === d
+  let fixed = today.slice(0, 4) + read.slice(4)
+  if (!valid(fixed)) return today // 29 Feb in a non-leap year
+  if (fixed > today) fixed = String(Number(today.slice(0, 4)) - 1) + read.slice(4)
+  return valid(fixed) && ok(fixed) ? fixed : today
+}

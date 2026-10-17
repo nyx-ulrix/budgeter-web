@@ -3,17 +3,18 @@ import { Secrets } from '../ai/secrets'
 import { budgetRows, Plan, totals, Tx } from './money'
 
 /*
- * The shared date budget lives in DateBudget's Firebase project (github.com/nyx-ulrix/DateBudget), so a partner on the
- * DateBudget site and Budgeter see the same budget. Sign-in: a Google ID token for Budgeter's own web client (safelisted
- * in DateBudget's Firebase Auth) is exchanged for a Firebase session over REST. Data: Firestore REST, refreshed every
- * few seconds while the screen is open instead of a live listener (no SDK).
- * Layout (see DateBudget's firestore.rules): budgets/{code} {members, names, plan}; budgets/{code}/tx/{id}.
+ * The shared date budget lives in Budgeter's own Firebase project (budgeter-510810), which the DateBudget site also
+ * uses, so a partner on either sees the same budget. One login: the Google account Budgeter already signs in with
+ * (its Sheets token, or Sign in with Google) is exchanged for a Firebase session over REST. The phone app
+ * (date/DateClient.kt) does exactly the same requests. Data: Firestore REST, refreshed every few seconds while a
+ * screen shows it (no SDK). Layout (DateBudget's firestore.rules): budgets/{code} {members, names, plan}; budgets/{code}/tx/{id}.
  */
-// DateBudget's Firebase web key, from .env.local (not committed). It ships in the page like any Firebase web key;
+// Budgeter's Firebase web key, from .env.local (not committed). It ships in the page like any Firebase web key;
 // it only works from the Budgeter and DateBudget sites and only for sign-in and the database.
-const KEY = process.env.EXPO_PUBLIC_DATEBUDGET_API_KEY ?? ''
-const DOCS = 'https://firestore.googleapis.com/v1/projects/datebudget/databases/(default)/documents'
-const SESSION = 'datebudget-session' // refresh token, encrypted (Secrets)
+const KEY = process.env.EXPO_PUBLIC_FIREBASE_API_KEY ?? ''
+const PROJECT = 'budgeter-510810'
+const DOCS = `https://firestore.googleapis.com/v1/projects/${PROJECT}/databases/(default)/documents`
+const SESSION = 'date-session-budgeter' // refresh token, encrypted (Secrets); new name, as DateBudget-project sessions don't carry over
 
 export interface Budget { code: string; members: string[]; names: Record<string, string>; plan: unknown }
 export interface DateState {
@@ -32,7 +33,8 @@ export interface DateState {
 let state: DateState = { phase: 'signedOut', txs: [], all: [], left: 0, topped: 0, spent: 0 }
 let session: { idToken: string; expires: number; refresh: string; uid: string; name: string } | null = null
 const listeners = new Set<() => void>()
-const set = (s: Partial<DateState>) => { state = { ...state, ...s }; listeners.forEach((l) => l()) }
+const setState = (s: Partial<DateState>) => { state = { ...state, ...s }; listeners.forEach((l) => l()) }
+const set = setState
 export const useDate = () => useSyncExternalStore((l) => { listeners.add(l); return () => { listeners.delete(l) } }, () => state)
 export const dateState = () => state
 
@@ -78,17 +80,28 @@ async function token(): Promise<string> {
 }
 
 /** Signs in with a Google ID token (from Sign in with Google). */
-export async function signIn(googleIdToken: string) {
+export const signIn = (googleIdToken: string) => signInWith(`id_token=${googleIdToken}`)
+
+/**
+ * The one login: signs in with the Google access token Budgeter already got for Sheets, unless already signed in.
+ * Called whenever Budgeter gets a token, so the date budget needs no sign-in of its own.
+ */
+export function signInWithGoogleToken(accessToken: string) {
+  if (session || state.phase === 'loading' || !KEY) return
+  void signInWith(`access_token=${accessToken}`, true)
+}
+
+async function signInWith(credential: string, quiet = false) {
   set({ phase: 'loading', error: undefined })
   try {
     const j = await post(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key=${KEY}`, {
-      postBody: `id_token=${googleIdToken}&providerId=google.com`, requestUri: location.origin, returnSecureToken: true,
+      postBody: `${credential}&providerId=google.com`, requestUri: location.origin, returnSecureToken: true,
     })
     session = { idToken: j.idToken, refresh: j.refreshToken, expires: Date.now() + Number(j.expiresIn) * 1000, uid: j.localId, name: j.displayName || j.firstName || 'Me' }
     await Secrets.put(SESSION, JSON.stringify({ refresh: session.refresh, uid: session.uid, name: session.name }))
     await refresh()
   } catch (e: any) {
-    set({ phase: 'signedOut', error: e?.message ?? 'Sign-in failed.' })
+    set({ phase: 'signedOut', error: quiet ? undefined : e?.message ?? 'Sign-in failed.' })
   }
 }
 
@@ -106,8 +119,10 @@ export async function resume() {
     const s = JSON.parse(saved)
     session = { idToken: '', expires: 0, refresh: s.refresh, uid: s.uid, name: s.name }
     set({ phase: 'loading' })
+    await token()
     await refresh()
   } catch {
+    session = null // the saved session no longer works: sign in again (quietly, with Budgeter's Google token)
     set({ phase: 'signedOut' })
   }
 }
@@ -123,9 +138,13 @@ async function api(method: string, path: string, body?: unknown): Promise<any> {
   return j
 }
 
+let latest = 0 // only the newest reload may write: an older one finishing late would drop a just-saved entry
+
 /** Reloads the budget and its entries. */
 export async function refresh() {
   if (!session) return
+  const mine = ++latest
+  const set = (s: Partial<DateState>) => { if (mine === latest) setState(s) }
   try {
     const q = await api('POST', ':runQuery', {
       structuredQuery: {
@@ -173,7 +192,7 @@ export async function join(code: string) {
   const c = code.trim().toUpperCase()
   await api('POST', ':commit', {
     writes: [{
-      update: { name: `projects/datebudget/databases/(default)/documents/budgets/${c}`, fields: { names: { mapValue: { fields: { [session!.uid]: { stringValue: session!.name } } } } } },
+      update: { name: `projects/${PROJECT}/databases/(default)/documents/budgets/${c}`, fields: { names: { mapValue: { fields: { [session!.uid]: { stringValue: session!.name } } } } } },
       updateMask: { fieldPaths: [`names.\`${session!.uid}\``] },
       updateTransforms: [{ fieldPath: 'members', appendMissingElements: { values: [{ stringValue: session!.uid }] } }],
       currentDocument: { exists: true },
@@ -190,8 +209,18 @@ export async function setPlan(plan: Plan) {
 export type Draft = { kind: Tx['kind']; amount: number; note: string; date: string }
 
 export async function addTx(d: Draft) {
-  await api('POST', `/budgets/${state.budget!.code}/tx`, { fields: fields({ ...d, by: session!.uid }) })
+  const doc = await api('POST', `/budgets/${state.budget!.code}/tx`, { fields: fields({ ...d, by: session!.uid }) })
+  const id = String(doc?.name ?? '').split('/').pop()
+  if (!id) throw new Error("The date budget didn't confirm the save. Try again.")
+  show({ id, ...d, by: session!.uid }) // in the list straight away, whatever the reload does
   await refresh()
+}
+
+/** Puts [t] into the loaded entries now (the next reload brings the stored copy). */
+function show(t: Tx) {
+  const txs = [t, ...state.txs.filter((x) => x.id !== t.id)].sort((a, b) => b.date.localeCompare(a.date))
+  const all = [t, ...state.all.filter((x) => x.id !== t.id)].sort((a, b) => b.date.localeCompare(a.date))
+  setState({ txs, all, ...totals(all) })
 }
 
 export async function updateTx(id: string, d: Draft) {

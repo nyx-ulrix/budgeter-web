@@ -40,4 +40,7 @@ yarn-error.*
 /ios
 /android
 .firebase/
-graphify-out/
+graphify-out/cache/
+graphify-out/20*/
+graphify-out/.graphify_python
+graphify-out/.graphify_root

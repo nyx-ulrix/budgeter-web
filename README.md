@@ -4,6 +4,8 @@ The web version of [Budgeter](https://github.com/nyx-ulrix/budgeter), the pixel-
 
 Live at **https://app.budgeter.liewjiaen.com**.
 
+
+Architecture diagrams, code flow charts and the list of platforms this project uses (GitHub, Firebase, Google Cloud, Cloudflare, AI providers) are in the [Budgeter README](https://github.com/nyx-ulrix/budgeter#how-it-fits-together); this app mirrors the Android app's layers file for file. A map of this repo's code is in [`graphify-out/graph.html`](graphify-out/graph.html) (summary: [`graphify-out/GRAPH_REPORT.md`](graphify-out/GRAPH_REPORT.md)).
 ## Shared with the phone app
 
 Turn on Google Sheets sync in both apps with the same Google account and they share everything: expenses, budget lines, planned purchases, trips, categories and settings. Both apps use one spreadsheet called "Budgeter":

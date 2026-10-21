@@ -112,8 +112,9 @@ async function keyOf(p: Provider): Promise<string> {
 /** One chat completion; returns the reply text. [image] is a data URL sent with the user message. */
 export async function chat(p: Provider, system: string, user: string, image?: string): Promise<string> {
   const content = image ? [{ type: 'text', text: user }, { type: 'image_url', image_url: { url: image } }] : user
+  // Gemini thinks at length by default, which made a receipt take many seconds; reading one needs little.
   const res = await http('POST', p.base.replace(/\/+$/, '') + '/chat/completions', await keyOf(p), p,
-    { model: p.model, messages: [{ role: 'system', content: system }, { role: 'user', content }] })
+    { model: p.model, ...(p.preset === 'gemini' && { reasoning_effort: 'low' }), messages: [{ role: 'system', content: system }, { role: 'user', content }] })
   const out = res?.choices?.[0]?.message?.content
   if (typeof out !== 'string') throw new Error(`${p.label} sent an unexpected reply.`)
   return out

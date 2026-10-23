@@ -21,7 +21,11 @@ Limits:
 
 ## Receipts
 
-With an AI provider set (Profile → AI), the receipt photo is sent to it to read (shrunk to 1600 px). Models that can't read images get the text read in your browser instead (Tesseract, which downloads about 10 MB the first time). Without a provider, the built-in reader runs entirely in your browser. AI keys are encrypted in this browser only and aren't synced to the phone.
+With an AI provider set (Profile → AI), the receipt photo is sent to it to read (shrunk to 1600 px). Gemini is asked to think little (`reasoning_effort: "low"`), which keeps a receipt to a few seconds. Models that can't read images get the text read in your browser instead (Tesseract, which downloads about 10 MB the first time). Without a provider, the built-in reader runs entirely in your browser. AI keys are encrypted in this browser only and aren't synced to the phone.
+
+## Date budget
+
+Expenses can count toward the date budget shared with a partner (Firestore in `budgeter-510810`, same as the phone and the DateBudget site). If one takes the fund below zero, whoever saved it covers the shortfall: a top-up "Over budget: …" goes to the fund and the same amount becomes their own expense. Only the part that expense overdraws counts.
 
 ## Data
 

@@ -1,17 +1,1 @@
-{
-  "0": "ProfileScreen.tsx",
-  "1": "state.ts",
-  "2": "TripScreen.tsx",
-  "3": "sheets.ts",
-  "4": "ExpenseScreen.tsx",
-  "5": "dependencies",
-  "6": "MacrosScreen.tsx",
-  "7": "expo",
-  "8": "DateScreen.tsx",
-  "9": "Budgeter Web",
-  "10": "AGENTS.md",
-  "11": "tsconfig.json",
-  "12": "MonthBar.tsx",
-  "13": "sheets.test.ts",
-  "14": "client.ts"
-}
+{"0": "ExpenseScreen.tsx", "1": "BudgetScreen.tsx", "2": "DateScreen.tsx", "3": "ai.ts", "4": "HomeScreen.tsx", "5": "core.test.ts", "6": "state.ts", "7": "Budgeter Web", "8": "sheets.ts", "9": "dependencies", "10": "expo", "11": "web", "12": "sheets.test.ts", "13": "adaptiveIcon", "14": "devDependencies", "15": "scripts", "16": "AGENTS.md", "17": "package.json", "18": "tsconfig.json", "19": "expo-font"}

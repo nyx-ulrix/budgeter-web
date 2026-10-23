@@ -1,6 +1,6 @@
 import { todayIso } from '../core/budget'
 import { periodOf, planFor, reserved, tripMonthly } from './ledger'
-import { AppState, Line, Plan, Planned, Setup, SyncInfo, Trip, TripCost, Txn, normLine, normPlan, normTxn, normPlanned } from './state'
+import { AppState, Line, Plan, Planned, Setup, SyncInfo, Trip, TripCost, Txn, myShare, normLine, normPlan, normTxn, normPlanned } from './state'
 
 /** Every state change the UI can make, as pure functions. The store stamps changed records after each one. */
 
@@ -26,9 +26,16 @@ export const removeLine = (s: AppState, key: string, id: string): AppState =>
 export const isSpentReserve = (s: AppState, l: Line): boolean =>
   l.kind === 'RESERVE' && l.plannedId != null && !s.planned.some((p) => p.id === l.plannedId && p.status === 'OPEN')
 
+/**
+ * Saves [t]. A "Buy now" expense edited below what was reserved for it frees the extra reservation
+ * (newest first), so that money isn't left neither spent nor free.
+ */
 export function saveTxn(s: AppState, t: Txn, now: number = Date.now()): AppState {
-  const stamped = { ...t, updatedAt: now }
-  return { ...s, txns: s.txns.some((x) => x.id === t.id) ? s.txns.map((x) => (x.id === t.id ? stamped : x)) : [...s.txns, stamped] }
+  const pid = t.plannedId
+  const excess = t.fromReserve - Math.max(myShare(t), 0)
+  const st = pid != null && excess > 0 ? withReserved(s, normPlanned({ id: pid, name: t.merchant, price: 0 }), reserved(s, pid) - excess) : s
+  const stamped = { ...t, fromReserve: excess > 0 ? t.fromReserve - excess : t.fromReserve, updatedAt: now }
+  return { ...st, txns: st.txns.some((x) => x.id === t.id) ? st.txns.map((x) => (x.id === t.id ? stamped : x)) : [...st.txns, stamped] }
 }
 
 /** Removes [t]: dropped outright if it never reached Sheets and sync is off, otherwise a tombstone sync can carry. */

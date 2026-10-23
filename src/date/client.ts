@@ -162,15 +162,23 @@ export async function refresh() {
     let page = ''
     do {
       const r = await api('GET', `/budgets/${code}/tx?pageSize=300${page ? `&pageToken=${page}` : ''}`)
-      for (const d of r.documents ?? []) txs.push({ id: d.name.split('/').pop(), ...decFields(d.fields ?? {}) } as Tx)
+      for (const d of r.documents ?? []) {
+        const x = decFields(d.fields ?? {})
+        // Whole minor units, rounded as Android does, even if a document holds a decimal.
+        txs.push({ ...x, id: d.name.split('/').pop(), amount: Math.round(Number(x.amount)) || 0 } as Tx)
+      }
       page = r.nextPageToken ?? ''
     } while (page)
-    // DateBudget's carry-over for budgets from its first version: a fixed starting amount counts as a top-up.
-    if (Number.isSafeInteger(f.base) && f.base > 0 && !txs.some((t) => t.id === 'starting-budget')) {
-      txs.push({ id: 'starting-budget', kind: 'topup', amount: f.base, note: 'Starting budget', date: today(), by: '' })
+    const rows = budgetRows(budget.plan, today())
+    // DateBudget's carry-over for budgets from its first version: a fixed starting amount counts as a top-up,
+    // once, on the budget's first day (dated today it would count again in every month's view).
+    const base = typeof f.base === 'number' ? Math.round(f.base) : 0
+    if (Number.isSafeInteger(base) && base > 0 && !txs.some((t) => t.id === 'starting-budget')) {
+      const first = [...txs, ...rows].map((t) => t.date).filter(Boolean).sort()[0] ?? today()
+      txs.push({ id: 'starting-budget', kind: 'topup', amount: base, note: 'Starting budget', date: first, by: '' })
     }
     txs.sort((a, b) => b.date.localeCompare(a.date))
-    const all = [...txs, ...budgetRows(budget.plan, today())].sort((a, b) => b.date.localeCompare(a.date))
+    const all = [...txs, ...rows].sort((a, b) => b.date.localeCompare(a.date))
     set({ phase: 'ready', uid: session.uid, name: session.name, budget, txs, all, ...totals(all), error: undefined })
   } catch (e: any) {
     set({ error: e?.message ?? 'Couldn\'t load the date budget.' })

@@ -78,6 +78,12 @@ export function parseMoney(text: string, currency: string): number | null {
   return v ? toSafe(roundHalfUp(v.m, v.e + digits(currency))) : null
 }
 
+/** A plain number (12.345, from JSON) → minor units, rounded half-up. No thousands guessing, unlike [parseMoney]. */
+export function toMinor(v: number, currency: string): number | null {
+  const r = Number.isFinite(v) ? decimal(String(v)) : null
+  return r ? toSafe(roundHalfUp(r.m, r.e + digits(currency))) : null
+}
+
 /** Converts a foreign amount to home currency at [rate] home units per 1 foreign unit. */
 export function convert(minor: number, from: string, to: string, rate: number): number {
   const r = decimal(String(rate))

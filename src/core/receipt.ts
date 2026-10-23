@@ -49,9 +49,12 @@ export function receiptDate(read: string, today: string, days = 60): string {
   const t = Date.parse(today + 'T00:00:00Z')
   const ok = (d: string) => { const x = Date.parse(d + 'T00:00:00Z'); return x <= t && x >= t - days * 86_400_000 }
   if (ok(read)) return read
-  const valid = (d: string) => new Date(d + 'T00:00:00Z').toISOString().slice(0, 10) === d
-  let fixed = today.slice(0, 4) + read.slice(4)
-  if (!valid(fixed)) return today // 29 Feb in a non-leap year
-  if (fixed > today) fixed = String(Number(today.slice(0, 4)) - 1) + read.slice(4)
-  return valid(fixed) && ok(fixed) ? fixed : today
+  // Like java.time's withYear: 29 Feb in a non-leap year becomes 28 Feb.
+  const withYear = (d: string, y: number) => {
+    const last = new Date(Date.UTC(y, Number(d.slice(5, 7)), 0)).getUTCDate()
+    return `${y}-${d.slice(5, 7)}-${String(Math.min(Number(d.slice(8, 10)), last)).padStart(2, '0')}`
+  }
+  let fixed = withYear(read, Number(today.slice(0, 4)))
+  if (fixed > today) fixed = withYear(fixed, Number(today.slice(0, 4)) - 1)
+  return ok(fixed) ? fixed : today
 }

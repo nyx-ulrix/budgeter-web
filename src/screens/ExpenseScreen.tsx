@@ -8,7 +8,7 @@ import { SPLIT_LABEL, SPLIT_METHODS, SplitMethod, itemShares, split } from '../c
 import { deleteTxn, saveTxn } from '../data/actions'
 import { activeTrip, currency } from '../data/ledger'
 import { rate as fetchRate } from '../data/rates'
-import { AppState, ME, MEAL_CATEGORY, Meal, Txn, newId, personId, personLabel } from '../data/state'
+import { AppState, ME, MEAL_CATEGORY, Meal, Txn, newId, normTxn, personId, personLabel } from '../data/state'
 import { MealDialog } from './MacrosScreen'
 import { store, useAppState } from '../data/store'
 import {
@@ -17,7 +17,7 @@ import {
 import { Screen, useNav } from '../ui/nav'
 import { Glyphs, Px, Type } from '../ui/theme'
 import { addTx, deleteTx, updateTx, useDate } from '../date/client'
-import type { Tx as DateTx } from '../date/money'
+import { overdrawn, type Tx as DateTx } from '../date/money'
 const DATE = 'date' // Count toward: the shared date budget
 
 type ExpenseRoute = Extract<Screen, { kind: 'expense' }>
@@ -141,7 +141,7 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
   const [readError, setReadError] = useState<string | null>(null)
   const providers = useMemo(() => Ai.providers(), [])
   const cur = d.paidCur
-  const splitting = d.people > 1
+  const splitting = d.people > 1 && d.tripId !== DATE // the date budget has no split (its window is hidden)
   const members = Array.from({ length: d.people }, (_, i) => personId(i + 1))
   const set = (patch: Partial<Draft>) => setD((x) => ({ ...x, ...patch }))
   const setItem = (key: string, patch: Partial<ItemDraft>) =>
@@ -219,8 +219,16 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
   function save(then: (id: string) => void = () => nav.back()) {
     if (d.tripId === DATE) { // the shared date fund, not my budget; moving a normal expense there takes it out of my budget
       const draft = { kind: 'expense' as const, amount: totalHome, note: (d.merchant.trim() || d.note.trim() || 'Date').slice(0, 100), date: d.date }
-      ;(dateTx ? updateTx(dateTx.id, draft) : addTx(draft))
-        .then(() => { if (existing) store.update((x) => deleteTxn(x, existing.id)); nav.back() }).catch((e) => alert(e.message))
+      // What this expense takes the fund below zero by, I paid: it tops the fund back up from my own budget.
+      const cover = overdrawn(ds.left, totalHome, dateTx?.amount ?? 0)
+      ;(async () => {
+        await (dateTx ? updateTx(dateTx.id, draft) : addTx(draft))
+        if (cover > 0) await addTx({ kind: 'topup', amount: cover, note: `Over budget: ${draft.note}`.slice(0, 100), date: draft.date })
+      })().then(() => {
+        if (existing) store.update((x) => deleteTxn(x, existing.id))
+        if (cover > 0) store.update((x) => saveTxn(x, normTxn({ date: draft.date, total: cover, category: d.category, merchant: draft.note, note: 'Date budget overspend' })))
+        nav.back()
+      }).catch((e) => alert(e.message))
       return
     }
     if (dateTx) deleteTx(dateTx.id).catch((e) => alert(e.message)) // moved out of the date budget into my own
@@ -345,7 +353,12 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
                 const t = trips.find((x) => x.id === id)
                 set({ tripId: id, ...(t ? { paidCur: t.currency } : {}) })
               }} />
-            {d.tripId === DATE ? <Small>Goes to the shared date budget (your partner sees it), not your daily budget.</Small>
+            {d.tripId === DATE ? <>
+              <Small>Goes to the shared date budget (your partner sees it), not your daily budget.</Small>
+              {overdrawn(ds.left, totalHome, dateTx?.amount ?? 0) > 0 && <Small color={Px.brown}>
+                The date budget is {money(overdrawn(ds.left, totalHome, dateTx?.amount ?? 0), home)} short, so that much comes out of your monthly budget.
+              </Small>}
+            </>
               : d.tripId != null && <Small>Comes out of the trip fund, not your daily budget.</Small>}
           </Window>
         )}

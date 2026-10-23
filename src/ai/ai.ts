@@ -1,4 +1,4 @@
-import { parseMoney } from '../core/money'
+import { toMinor } from '../core/money'
 import type { ParsedReceipt } from '../core/receipt'
 import * as ReceiptText from '../core/receiptText'
 import { newId } from '../data/state'
@@ -143,7 +143,7 @@ export async function parse(p: Provider | null, text: string, fallbackCurrency: 
   try { d = JSON.parse(a >= 0 && b > a ? reply.slice(a, b + 1) : '') } catch { throw new Error(`${p.label} didn't return receipt data. Try again or use the built-in reader.`) }
   const curIn = typeof d.currency === 'string' && d.currency.length === 3 ? d.currency.toUpperCase() : null
   const cur = curIn ?? fallbackCurrency
-  const m = (v: unknown) => (typeof v === 'number' && Number.isFinite(v) ? parseMoney(String(v), cur) : null)   // exact, half-up
+  const m = (v: unknown) => (typeof v === 'number' ? toMinor(v, cur) : null)   // exact, half-up
   return {
     merchant: d.merchant ?? '',
     date: typeof d.date === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.date) ? d.date : null,

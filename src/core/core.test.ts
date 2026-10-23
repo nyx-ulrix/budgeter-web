@@ -1,7 +1,8 @@
 /// <reference types="node" />
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
-import { allocate, convert, money, parseMoney, plain } from './money'
+import { allocate, convert, money, parseMoney, plain, toMinor } from './money'
+import { overdrawn } from '../date/money'
 import { daySpend, periodOf, periodOfKey, nextPeriod, today, pace } from './budget'
 import { split, itemShares } from './split'
 import { parsedReceipt, receiptItem, itemCosts, mismatch, receiptDate } from './receipt'
@@ -235,4 +236,25 @@ test('scanned receipt year is kept recent', () => {
   assert.equal(receiptDate('2026-10-16', '2026-10-17'), '2026-10-16') // fine as is
   assert.equal(receiptDate('2026-12-30', '2026-01-05'), '2025-12-30') // future: last year
   assert.equal(receiptDate('2026-03-01', '2026-10-17'), '2026-10-17') // just old: today
+})
+
+test('29 Feb from an old year lands on 28 Feb, as on Android', () => {
+  assert.equal(receiptDate('2024-02-29', '2026-03-15'), '2026-02-28')
+  assert.equal(receiptDate('2024-02-29', '2028-03-10'), '2028-02-29') // a leap year keeps it
+})
+
+test('AI numbers become exact minor units, no thousands guessing', () => {
+  assert.equal(toMinor(0.675, 'SGD'), 68)
+  assert.equal(toMinor(12.345, 'USD'), 1235)
+  assert.equal(toMinor(1234.5, 'JPY'), 1235)
+  assert.equal(toMinor(1.2345, 'KWD'), 1235)
+  assert.equal(toMinor(Infinity, 'SGD'), null)
+})
+
+test('date overspend: only what this expense overdraws', () => {
+  assert.equal(overdrawn(5_000, 12_000), 7_000)        // 50 left, 120 dinner: 70 short
+  assert.equal(overdrawn(20_000, 5_000), 0)            // fits
+  assert.equal(overdrawn(-7_000, 1_000), 1_000)        // already short: only this one
+  assert.equal(overdrawn(-7_000, 10_000, 10_000), 7_000) // re-saving the expense that went 70 over
+  assert.equal(overdrawn(0, 10_000, 10_000), 0)        // already covered: nothing twice
 })

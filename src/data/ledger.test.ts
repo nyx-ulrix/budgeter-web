@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { AppState, Loose, ME, Txn, budgetImpact, normLine, normPlan, normPlanned, normSetup, normState, normTrip, normTxn, normTxnItem } from './state'
 import { activeTrip, available, monthSaved, planFor, planSpendable, reserved, savedToDate, snapshot, spendable, tripFund, tripSpent } from './ledger'
-import { withReserved, buyNow, deletePlanned, deleteTxn, isSpentReserve, removeLine } from './actions'
+import { withReserved, buyNow, deletePlanned, deleteTxn, isSpentReserve, removeLine, saveTxn } from './actions'
 
 const setup = { country: 'SG', currency: 'SGD', startDay: 1, name: '' }
 const oct5 = '2026-10-05'
@@ -171,3 +171,15 @@ test('reserving today leaves earlier days alone', () => {
   assert.equal(planFor(sep, '2026-10').lines[0].added, undefined)
 })
 
+test('a bought item edited below its reservation frees the rest', () => {
+  const p = normPlanned({ id: 'p', name: 'Shoes', price: 50_000, targetMonth: '2026-10' })
+  const st = withReserved(state({ plans: { '2026-10': normPlan({ income: 300_000 }) }, planned: [p] }), p, 50_000, oct5)
+  const bought = buyNow(st, p, 'Shopping', oct5)
+  assert.equal(spendable(bought, '2026-10'), 250_000)
+  const t = bought.txns[bought.txns.length - 1]
+  const edited = saveTxn(bought, { ...t, total: 30_000 }, 1)
+  assert.equal(edited.txns.find((x) => x.id === t.id)!.fromReserve, 30_000)
+  assert.equal(reserved(edited, 'p'), 30_000)
+  assert.equal(spendable(edited, '2026-10'), 270_000)
+  assert.equal(saveTxn(bought, { ...t, total: 60_000 }, 1).txns.find((x) => x.id === t.id)!.fromReserve, 50_000) // dearer: unchanged
+})

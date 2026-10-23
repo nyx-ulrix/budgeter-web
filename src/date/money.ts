@@ -93,3 +93,9 @@ export function totals(txs: Tx[]) {
   const spent = sum('expense')
   return { topped, spent, left: topped - spent }
 }
+
+/**
+ * How far an expense of [amount] (replacing one of [old] when editing) takes the fund below zero, given [left] now:
+ * only the part this expense overdraws, never what was already short. The person who paid covers it from their budget.
+ */
+export const overdrawn = (left: number, amount: number, old = 0): number => Math.max(Math.min(amount, amount - old - left), 0)

@@ -30,8 +30,8 @@
     "semantic_hash": ""
   },
   "src/ai/ai.ts": {
-    "mtime": 1792604171.953328,
-    "ast_hash": "bed2e185d0c85ca3dfdd270ce3fa5a3d",
+    "mtime": 1792684897.3037071,
+    "ast_hash": "04efdff07c9fb451f7bbd923ea45316a",
     "semantic_hash": ""
   },
   "src/ai/openrouter.ts": {
@@ -50,18 +50,18 @@
     "semantic_hash": ""
   },
   "src/core/core.test.ts": {
-    "mtime": 1792223726.3799267,
-    "ast_hash": "c15636893fcb3bfc7ebb24b30a8cf44e",
+    "mtime": 1792723562.2504683,
+    "ast_hash": "1189db80851b54a3fd56341aa616a80f",
     "semantic_hash": ""
   },
   "src/core/money.ts": {
-    "mtime": 1791852628.264751,
-    "ast_hash": "07d755c54c4a708935cdc86154c668d9",
+    "mtime": 1792684890.2408392,
+    "ast_hash": "b57b1ac06d038cc41ddb1397b1d6251c",
     "semantic_hash": ""
   },
   "src/core/receipt.ts": {
-    "mtime": 1792223726.354699,
-    "ast_hash": "7d4e5b433985d3f70288337e778ba9ae",
+    "mtime": 1792684980.2219613,
+    "ast_hash": "506da2dce932ba4c056514f31d9dfcc1",
     "semantic_hash": ""
   },
   "src/core/receiptText.ts": {
@@ -75,8 +75,8 @@
     "semantic_hash": ""
   },
   "src/data/actions.ts": {
-    "mtime": 1792053120.7315247,
-    "ast_hash": "f7152b7a5b31504b19523e1b9b10ffaa",
+    "mtime": 1792684819.5631235,
+    "ast_hash": "5996265e1a1065a71741acd2266f718f",
     "semantic_hash": ""
   },
   "src/data/countries.ts": {
@@ -85,8 +85,8 @@
     "semantic_hash": ""
   },
   "src/data/ledger.test.ts": {
-    "mtime": 1791868080.0760617,
-    "ast_hash": "b7f62c4889d1f544c280c6d29fd8c436",
+    "mtime": 1792723508.8392153,
+    "ast_hash": "114b3a7025fcd633b471c3e781e6ce2c",
     "semantic_hash": ""
   },
   "src/data/ledger.ts": {
@@ -130,8 +130,8 @@
     "semantic_hash": ""
   },
   "src/screens/ExpenseScreen.tsx": {
-    "mtime": 1792223726.3689284,
-    "ast_hash": "b9773dfe842acca87b0a33783748e3c5",
+    "mtime": 1792685000.0167322,
+    "ast_hash": "9e07f4617dd5557e4bdff3215610f70e",
     "semantic_hash": ""
   },
   "src/screens/HomeScreen.tsx": {
@@ -290,13 +290,13 @@
     "semantic_hash": ""
   },
   "src/date/client.ts": {
-    "mtime": 1792223535.824141,
-    "ast_hash": "1268a17f85ecc39207c2d01b185b13c1",
+    "mtime": 1792684917.312049,
+    "ast_hash": "446ae8cf9e459972c2c9794535ee28ae",
     "semantic_hash": ""
   },
   "src/date/money.ts": {
-    "mtime": 1791874413.0638766,
-    "ast_hash": "8815dc42fed29267e4cfc547b1e517be",
+    "mtime": 1792684980.2219613,
+    "ast_hash": "ac1e4ec9a913981df08337b7e7cceeee",
     "semantic_hash": ""
   },
   "src/screens/DateScreen.tsx": {

@@ -1,1 +1,12 @@
-{"0": "ExpenseScreen.tsx", "1": "BudgetScreen.tsx", "2": "DateScreen.tsx", "3": "ai.ts", "4": "HomeScreen.tsx", "5": "core.test.ts", "6": "state.ts", "7": "Budgeter Web", "8": "sheets.ts", "9": "dependencies", "10": "expo", "11": "web", "12": "sheets.test.ts", "13": "adaptiveIcon", "14": "devDependencies", "15": "scripts", "16": "AGENTS.md", "17": "package.json", "18": "tsconfig.json", "19": "expo-font"}
+{
+  "0": "ExpenseScreen.tsx",
+  "1": "BudgetScreen.tsx",
+  "2": "DateScreen.tsx",
+  "3": "ai.ts",
+  "5": "core.test.ts",
+  "6": "state.ts",
+  "7": "Budgeter Web",
+  "8": "sheets.ts",
+  "16": "AGENTS.md",
+  "18": "tsconfig.json"
+}

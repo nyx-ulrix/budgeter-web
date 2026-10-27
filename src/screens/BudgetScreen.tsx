@@ -4,7 +4,7 @@ import { addDays, daysBetween, nextPeriod, prevPeriod, todayIso } from '../core/
 import { digits, div, money, parseMoney, plain } from '../core/money'
 import { addLine, editPlan, removeLine, setReserved, isSpentReserve } from '../data/actions'
 import {
-  available, currency, monthSaved, periodFromKey, periodOf, planFor, planTotal, reserved, savedToDate, snapshot, spendable, spent,
+  available, currency, monthSaved, periodFromKey, periodOf, planFor, planTotal, reserved, savedToDate, savingsHistory, snapshot, spendable, spent,
 } from '../data/ledger'
 import { AppState, LINE_KINDS, LineKind, Plan, Planned, normLine } from '../data/state'
 import { store, useAppState } from '../data/store'
@@ -14,6 +14,51 @@ import { useNav } from '../ui/nav'
 import { Px, Type } from '../ui/theme'
 import { TripsWindow } from './TripScreen'
 import { DateBudgetFold } from './DateScreen'
+
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+const monthName = (key: string) => `${MONTHS[Number(key.slice(5)) - 1]} ${key.slice(0, 4)}`
+
+/**
+ * The last 12 finished months up to [upTo]: a bar each (green saved, red went over) around a zero line,
+ * then the same months newest first with the running total.
+ */
+function PastMonths({ st, upTo, cur }: { st: AppState; upTo: string; cur: string }) {
+  const months = savingsHistory(st).filter((m) => m.key <= upTo).slice(-12)
+  if (months.length === 0) return <Small>Past months show here once your first month ends.</Small>
+  const up = Math.max(...months.map((m) => m.saved), 0)
+  const down = Math.max(...months.map((m) => -m.saved), 0)
+  const height = 72
+  const scale = height / Math.max(up + down, 1)
+  return (
+    <View style={{ gap: 8 }}>
+      <Label>Past months</Label>
+      <View role="img" aria-label={'Saved per month: ' + months.map((m) => `${monthName(m.key)} ${money(m.saved, cur)}`).join(', ')}
+        style={{ flexDirection: 'row', gap: 4 }}>
+        {months.map((m) => (
+          <View key={m.key} style={{ flex: 1, maxWidth: 44, alignItems: 'stretch' }} aria-hidden>
+            <View style={{ height: up * scale, justifyContent: 'flex-end' }}>
+              {m.saved > 0 && <View style={{ height: Math.max(m.saved * scale, 2), backgroundColor: Px.green }} />}
+            </View>
+            <View style={{ height: 2, backgroundColor: Px.brown }} />
+            <View style={{ height: down * scale }}>
+              {m.saved < 0 && <View style={{ height: Math.max(-m.saved * scale, 2), backgroundColor: Px.red }} />}
+            </View>
+            <Text style={[Type.label, { textAlign: 'center' }]}>{MONTHS[Number(m.key.slice(5)) - 1][0]}</Text>
+          </View>
+        ))}
+      </View>
+      {months.toReversed().map((m) => (
+        <View key={m.key} style={{ ...row, gap: 8 }}>
+          <Body style={{ flex: 1 }}>{monthName(m.key)}</Body>
+          <View style={{ alignItems: 'flex-end' }}>
+            <Text style={[Type.body, { color: m.saved < 0 ? Px.red : Px.green }]}>{(m.saved > 0 ? '+' : '') + money(m.saved, cur)}</Text>
+            <Small>{'Total ' + money(m.total, cur)}</Small>
+          </View>
+        </View>
+      ))}
+    </View>
+  )
+}
 
 /** Compose's remember(keys) { init }: state that resets to [init] whenever any of [deps] changes. */
 function useKeyed<T>(init: () => T, deps: unknown[]): [T, (v: T) => void] {
@@ -75,6 +120,7 @@ export function BudgetScreen() {
           </View>
         </View>
         <Small>Whatever you don't spend becomes savings when the month ends, including money you never budgeted. A month that goes over takes it back out.</Small>
+        <PastMonths st={st} upTo={key} cur={cur} />
       </FoldWindow>
 
       <Side>

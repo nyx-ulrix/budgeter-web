@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { AppState, Loose, ME, Txn, budgetImpact, normLine, normPlan, normPlanned, normSetup, normState, normTrip, normTxn, normTxnItem } from './state'
-import { activeTrip, available, monthSaved, planFor, planSpendable, reserved, savedToDate, snapshot, spendable, tripFund, tripSpent } from './ledger'
+import { activeTrip, available, monthSaved, planFor, planSpendable, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
 import { withReserved, buyNow, deletePlanned, deleteTxn, isSpentReserve, removeLine, saveTxn } from './actions'
 
 const setup = { country: 'SG', currency: 'SGD', startDay: 1, name: '' }
@@ -125,8 +125,14 @@ test('unspent money becomes savings', () => {
   assert.equal(spendable(st, '2026-10'), 150_000) // budget carries over
   assert.equal(savedToDate(st, '2026-10', '2026-10-15'), 80_000) // only finished months
   assert.equal(savedToDate(st, '2026-09', '2026-09-20'), 0)
+  assert.deepEqual(savingsHistory(st, '2026-11-15'), [ // Oct inherits Sep's plan and spends nothing
+    { key: '2026-09', saved: 80_000, total: 80_000 },
+    { key: '2026-10', saved: 200_000, total: 280_000 },
+  ])
+  assert.deepEqual(savingsHistory(state({}), '2026-11-15'), [])
   const over = { ...st, txns: [txn({ date: '2026-09-10', total: 250_000 })] }
   assert.equal(monthSaved(over, '2026-09'), -50_000) // overspend comes out of savings
+  assert.deepEqual(savingsHistory(over, '2026-11-15').map((m) => m.total), [-50_000, 150_000])
   assert.equal(snapshot(over, '2026-09-20').over, true)
   const noBudget = { ...st, plans: { '2026-09': normPlan({ income: 300_000 }) } }
   assert.equal(spendable(noBudget, '2026-09'), 300_000) // no budget set: everything available

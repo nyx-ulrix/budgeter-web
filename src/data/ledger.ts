@@ -38,15 +38,26 @@ export function planFor(s: AppState, key: string): Plan {
 export const monthSaved = (s: AppState, key: string): number =>
   planTotal(planFor(s, key), 'SAVINGS') + available(s, key) - spent(s, periodFromKey(s, key))
 
-/** Savings from the first month through [key], counting only months that have ended by [date]. */
-export function savedToDate(s: AppState, key: string, date: string = todayIso()): number {
+/** A finished month: what it saved and the savings total from the first month through it. */
+export interface MonthSaving { key: string; saved: number; total: number }
+
+/** Every month from the first plan that has ended by [date], oldest first. */
+export function savingsHistory(s: AppState, date: string = todayIso()): MonthSaving[] {
   const keys = Object.keys(s.plans).sort()
-  if (keys.length === 0) return 0
-  let p = periodFromKey(s, keys[0])
+  if (keys.length === 0) return []
+  const out: MonthSaving[] = []
   let total = 0
-  while (p.key <= key && p.end <= date) { total += monthSaved(s, p.key); p = nextPeriod(p) }
-  return total
+  for (let p = periodFromKey(s, keys[0]); p.end <= date; p = nextPeriod(p)) {
+    const saved = monthSaved(s, p.key)
+    total += saved
+    out.push({ key: p.key, saved, total })
+  }
+  return out
 }
+
+/** Savings from the first month through [key], counting only months that have ended by [date]. */
+export const savedToDate = (s: AppState, key: string, date: string = todayIso()): number =>
+  savingsHistory(s, date).filter((m) => m.key <= key).at(-1)?.total ?? 0
 
 export const planTotal = (p: Plan, kind: LineKind): number => sum(p.lines.filter((l) => l.kind === kind).map((l) => l.amount))
 

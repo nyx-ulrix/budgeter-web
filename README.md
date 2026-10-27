@@ -1,6 +1,6 @@
 # Budgeter Web
 
-The web version of [Budgeter](https://github.com/nyx-ulrix/budgeter), the pixel-art budget planner. Same features as the Android app (daily budget with carry-over, receipt scanning with AI, bill splitting, trips, planned purchases, savings target), built with React Native for Web (Expo). No widgets.
+The web version of [Budgeter](https://github.com/nyx-ulrix/budgeter), the pixel-art budget planner. Same features as the Android app (daily budget with carry-over, receipt scanning with AI, bill splitting, trips, planned purchases, savings target and a month-by-month savings history), built with React Native for Web (Expo). No widgets.
 
 Live at **https://app.budgeter.liewjiaen.com**.
 

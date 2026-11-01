@@ -2,12 +2,12 @@ import React, { useState } from 'react'
 import { Text, View } from 'react-native'
 import { addDays, Day, daysBetween, Pace, PACE_LABEL, todayIso } from '../core/budget'
 import { allocate, money, parseMoney, plain } from '../core/money'
-import { activeTrip, bankBalance, currency, dailyImpact, liveTxns, snapshot, Snapshot, tripFund, tripSpent } from '../data/ledger'
+import { activeTrip, bankBalance, bankStart, currency, dailyImpact, liveTxns, snapshot, Snapshot, tripFund, tripSpent } from '../data/ledger'
 import { editSetup } from '../data/actions'
 import { Planned } from '../data/state'
 import { store, useAppState } from '../data/store'
 import { useScanner } from '../ocr/scanner'
-import { ArtImg, Body, Chip, DateField, FoldWindow, Label, Page, PixelButton, PixelDialog, PixelField, PixelProgress, Small, Window, frame, Avatar, Side } from '../ui/components'
+import { ArtImg, Body, Chip, FoldWindow, Label, Page, PixelButton, PixelDialog, PixelField, PixelProgress, Small, Window, frame, Avatar, Side } from '../ui/components'
 import { MonthBar, Swatch } from '../ui/MonthBar'
 import { useNav } from '../ui/nav'
 import { Glyphs, Px, Type } from '../ui/theme'
@@ -176,10 +176,10 @@ function BankRow() {
             <PixelButton text={shown ? 'Hide' : 'Show'} onPress={() => setShown(!shown)} kind="secondary" />
           </>}
       </View>
-      {balance == null && <Small>Enter your bank balance once to check the app's tally against it.</Small>}
+      {balance == null && <Small>Enter what was in your bank before you started Budgeter to check every deduction against it.</Small>}
       {shown && bank && <>
-        <Small>{`From your balance on ${bank.date}, plus income and extra money, less fixed costs and what you've paid since. Different from the bank? Something wasn't logged.`}</Small>
-        <PixelButton text="Update balance" onPress={() => setEditing(true)} kind="secondary" style={{ alignSelf: 'flex-start' }} />
+        <Small>{`${money(bank.amount, cur)} in the bank on ${bank.date}, plus income and extra money, less fixed costs and everything paid since. Different from the bank? Something wasn't logged.`}</Small>
+        <PixelButton text="Starting balance" onPress={() => setEditing(true)} kind="secondary" style={{ alignSelf: 'flex-start' }} />
       </>}
       {editing && <BankDialog onDismiss={() => setEditing(false)} />}
     </View>
@@ -189,16 +189,15 @@ function BankRow() {
 function BankDialog({ onDismiss }: { onDismiss: () => void }) {
   const st = useAppState()
   const cur = currency(st)
-  const [text, setText] = useState(() => (st.setup?.bank ? plain(bankBalance(st) ?? 0, cur) : ''))
-  const [date, setDate] = useState(todayIso())
+  const start = bankStart(st)
+  const [text, setText] = useState(() => (st.setup?.bank?.date === start ? plain(st.setup.bank.amount, cur) : ''))
   const amount = parseMoney(text, cur)
   return (
-    <PixelDialog title="Bank balance" onDismiss={onDismiss}>
-      <PixelField value={text} onChange={setText} label="Balance the bank shows" keyboard="decimal-pad" error={text !== '' && amount == null ? 'Not an amount' : undefined} />
-      <DateField label="At the end of" value={date} onChange={setDate} />
-      <Small>Log everything up to that day first. From then on the app adds income and takes off what you pay.</Small>
+    <PixelDialog title="Starting balance" onDismiss={onDismiss}>
+      <PixelField value={text} onChange={setText} label={`In the bank at the end of ${start}`} keyboard="decimal-pad" error={text !== '' && amount == null ? 'Not an amount' : undefined} />
+      <Small>What you had before you started Budgeter. Every month since adds its income and extra money and takes off its fixed costs and everything you paid, so the total should match your bank.</Small>
       <PixelButton text="Save" enabled={amount != null} onPress={() => {
-        store.update((s) => editSetup(s, { ...s.setup!, bank: { amount: amount!, date } }))
+        store.update((s) => editSetup(s, { ...s.setup!, bank: { amount: amount!, date: start } }))
         onDismiss()
       }} />
     </PixelDialog>

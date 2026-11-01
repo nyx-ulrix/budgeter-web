@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { AppState, Loose, ME, Txn, budgetImpact, normLine, normPlan, normPlanned, normSetup, normState, normTrip, normTxn, normTxnItem } from './state'
-import { activeTrip, available, monthSaved, planFor, planSpendable, bankBalance, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
+import { activeTrip, available, monthSaved, planFor, planSpendable, bankBalance, bankStart, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
 import { withReserved, buyNow, deletePlanned, deleteTxn, isSpentReserve, removeLine, saveTxn } from './actions'
 
 const setup = { country: 'SG', currency: 'SGD', startDay: 1, name: '' }
@@ -209,6 +209,7 @@ test('bank balance: entered balance plus what moved after its day', () => {
     ],
   })
   assert.equal(bankBalance(state({}), '2026-10-31'), undefined)
+  assert.equal(bankStart(st), '2026-09-30') // the day before the first budget month
   assert.equal(bankBalance(st, '2026-10-15'), 500_000)
   assert.equal(bankBalance(st, '2026-10-31'), 500_000 + 5_000 - 2_000 - 6_000 - 6_000)
   // November's plan (carried over) lands on 1 Nov: income in, rent out.

@@ -67,6 +67,12 @@ export const cashOut = (t: Txn): number =>
   t.payer === ME ? t.total - sum(t.paidBack.filter((w) => w !== ME).map((w) => t.shares[w] ?? 0))
     : t.paidBack.includes(ME) ? myShare(t) : 0
 
+/** The day before the first budget month: a bank balance from then means everything logged since counts. */
+export function bankStart(s: AppState): string {
+  const first = Object.keys(s.plans).sort()[0]
+  return addDays((first ? periodFromKey(s, first) : periodOf(s)).start, -1)
+}
+
 /**
  * What should be in the bank at the end of [date], or undefined before a balance is entered: the balance the bank showed
  * at the end of its day, plus the income, extra money and fixed costs after it, less what expenses after it took out.

@@ -222,6 +222,7 @@ export async function addTx(d: Draft) {
   if (!id) throw new Error("The date budget didn't confirm the save. Try again.")
   show({ id, ...d, by: session!.uid }) // in the list straight away, whatever the reload does
   await refresh()
+  return id
 }
 
 /** Puts [t] into the loaded entries now (the next reload brings the stored copy). */

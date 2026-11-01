@@ -113,6 +113,7 @@ export interface Txn {
   tripId?: string
   foreign?: Foreign
   plannedId?: string
+  dateId?: string // a date budget overspend charge: the date expense it belongs to
   fromReserve: number // already deducted earlier as a reservation
   updatedAt: number
   syncedAt?: number
@@ -254,6 +255,7 @@ export const normTxn = (o: Loose<Txn>): Txn => ({
   tripId: opt(o.tripId),
   foreign: o.foreign ? { currency: o.foreign.currency, amount: o.foreign.amount, rate: o.foreign.rate } : undefined,
   plannedId: opt(o.plannedId),
+  dateId: opt(o.dateId),
   fromReserve: o.fromReserve ?? 0,
   updatedAt: o.updatedAt ?? Date.now(),
   syncedAt: opt(o.syncedAt),

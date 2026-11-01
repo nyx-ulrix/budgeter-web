@@ -18,6 +18,20 @@ export const periodFromKey = (s: AppState, key: string): Period => periodOfKey(k
 
 export const liveTxns = (s: AppState): Txn[] => s.txns.filter((t) => !t.deleted)
 
+/** The note on my budget's charge for the part of a date expense the shared fund couldn't cover. */
+export const OVERSPEND = 'Date budget overspend'
+
+type DateRef = { id: string; date: string; note: string }
+
+/**
+ * My overspend charges for date expense [d]: linked by its id, or (older, unlinked ones) by its day and name,
+ * but only when no other expense in [dates] has the same day and name.
+ */
+export function overspendsFor(s: AppState, d: DateRef, dates: DateRef[] = []): Txn[] {
+  const unique = !dates.some((x) => x.id !== d.id && x.date === d.date && x.note === d.note)
+  return liveTxns(s).filter((t) => t.note === OVERSPEND && (t.dateId != null ? t.dateId === d.id : unique && t.date === d.date && t.merchant === d.note))
+}
+
 /**
  * The plan for a period. A period nobody has edited yet inherits the latest earlier plan's income, fixed costs,
  * savings, caps and monthly budget (not extras, reservations or trip funds, which are one-offs).

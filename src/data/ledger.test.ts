@@ -2,8 +2,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { AppState, Loose, ME, Txn, budgetImpact, normLine, normPlan, normPlanned, normSetup, normState, normTrip, normTxn, normTxnItem } from './state'
-import { activeTrip, available, monthSaved, planFor, planSpendable, bankBalance, bankStart, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
-import { withReserved, buyNow, deletePlanned, deleteTxn, isSpentReserve, removeLine, saveTxn } from './actions'
+import { activeTrip, available, monthSaved, planFor, planSpendable, bankBalance, bankStart, OVERSPEND, overspendsFor, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
+import { withReserved, buyNow, chargeOverspend, deletePlanned, deleteTxn, dropOverspends, isSpentReserve, removeLine, saveTxn } from './actions'
 
 const setup = { country: 'SG', currency: 'SGD', startDay: 1, name: '' }
 const oct5 = '2026-10-05'
@@ -216,4 +216,21 @@ test('bank balance: entered balance plus what moved after its day', () => {
   assert.equal(bankBalance(st, '2026-11-01'), 491_000 + 300_000 - 100_000)
   const paidBack = { ...st, txns: st.txns.map((t) => (t.payer === 'P2' ? { ...t, paidBack: [ME] } : t)) }
   assert.equal(bankBalance(paidBack, '2026-10-31'), 491_000 - 2_000) // my share leaves once I pay P2 back
+})
+
+test('a date expense has at most one overspend charge, replaced on every save', () => {
+  const dinner = { id: 'd1', date: '2026-10-31', note: 'sweet cheeks' }
+  const old = txn({ date: '2026-10-31', total: 1_300, merchant: 'sweet cheeks', note: OVERSPEND }) // saved before charges were linked
+  let st = state({ txns: [old, txn({ date: '2026-10-31', total: 500, merchant: 'sweet cheeks' })] })
+  assert.deepEqual(overspendsFor(st, dinner).map((t) => t.id), [old.id]) // found by day and name; the normal expense isn't one
+  const twin = { id: 'd2', date: '2026-10-31', note: 'sweet cheeks' }
+  assert.deepEqual(overspendsFor(st, dinner, [dinner, twin]), []) // two expenses with that day and name: an unlinked charge is neither's
+  st = chargeOverspend(st, dinner, 700, 'Food')
+  assert.deepEqual(overspendsFor(st, dinner).map((t) => [t.total, t.dateId]), [[700, 'd1']]) // replaced, now linked
+  const moved = { id: 'd1', date: '2026-11-02', note: 'sweet cheeks' }
+  st = chargeOverspend(st, moved, 0, 'Food', dinner) // moved to a month whose fund covers it
+  assert.deepEqual([...overspendsFor(st, dinner), ...overspendsFor(st, moved)], [])
+  const fresh = chargeOverspend(state({}), dinner, 1_300, 'Food')
+  assert.deepEqual(overspendsFor(fresh, dinner).map((t) => [t.total, t.note, t.dateId]), [[1_300, OVERSPEND, 'd1']])
+  assert.deepEqual(overspendsFor(dropOverspends(fresh, dinner), dinner), [])
 })

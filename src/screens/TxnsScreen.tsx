@@ -3,7 +3,7 @@ import { Pressable, Text, View } from 'react-native'
 import { addDays, inPeriod, nextPeriod, prevPeriod } from '../core/budget'
 import { money } from '../core/money'
 import { togglePaidBack } from '../data/actions'
-import { currency, liveTxns, periodFromKey, periodOf } from '../data/ledger'
+import { OVERSPEND, currency, liveTxns, periodFromKey, periodOf } from '../data/ledger'
 import { ME, Txn, debtors, isSplit, myShare, personLabel } from '../data/state'
 import { store, useAppState } from '../data/store'
 import { ArtImg, Body, Chip, Choice, FoldWindow, KeyValue, Label, Page, PixelButton, PixelField, Rule, Small, Window, Side } from '../ui/components'
@@ -12,7 +12,7 @@ import { Px, Type } from '../ui/theme'
 import { Toggles } from './ExpenseScreen'
 import { useDate } from '../date/client'
 import type { Tx as DateTx } from '../date/money'
-import { DateTxnRow, useDateRefresh } from './DateScreen'
+import { DateTxnRow, coverTopups, useDateRefresh } from './DateScreen'
 
 const DOW = ['SUN', 'MON', 'TUE', 'WED', 'THU', 'FRI', 'SAT']
 const SCOPES = ['All', 'Budget', 'Trips', 'Split', 'Dates']
@@ -24,9 +24,12 @@ export function TxnsScreen() {
   const [query, setQuery] = useState('')
   const [scope, setScope] = useState('All')
   const p = periodFromKey(st, key)
+  const ds = useDate()
+  useDateRefresh()
   const q = query.toLowerCase()
   const list = liveTxns(st)
     .filter((t) => inPeriod(p, t.date))
+    .filter((t) => !(ds.phase === 'ready' && t.note === OVERSPEND)) // shown on its date expense's row
     .filter((t) => category == null || t.category === category || t.items.some((i) => i.category === category))
     .filter((t) => !query.trim() || [t.merchant, t.note, t.items.map((i) => i.name).join(', ')].join(' ').toLowerCase().includes(q))
     .filter((t) => scope === 'Budget' ? t.tripId == null : scope === 'Trips' ? t.tripId != null : scope === 'Split' ? isSplit(t) : scope !== 'Dates')
@@ -36,10 +39,11 @@ export function TxnsScreen() {
   const active = !!query.trim() || scope !== 'All' || category != null
   // Date budget entries (shared fund) join the list. Total = my share of each expense plus the date spending I paid
   // (not my partner's, so a meal counts once, for whoever paid; not top-ups).
-  const ds = useDate()
-  useDateRefresh()
-  const dates = ds.phase !== 'ready' || category != null || (scope !== 'All' && scope !== 'Dates') ? []
-    : ds.txs.filter((d) => inPeriod(p, d.date) && (!query.trim() || d.note.toLowerCase().includes(q)))
+  // Each date expense shows once: its overspend charge (in my budget) and the fund's cover top-up are on its row.
+  const ready = ds.phase === 'ready'
+  const covers = new Set(ready ? ds.txs.filter((d) => d.kind === 'expense').flatMap((d) => coverTopups(ds.txs, d)).map((d) => d.id) : [])
+  const dates = !ready || category != null || (scope !== 'All' && scope !== 'Dates') ? []
+    : ds.txs.filter((d) => inPeriod(p, d.date) && !covers.has(d.id) && (!query.trim() || d.note.toLowerCase().includes(q)))
   const rows: ({ k: 'txn'; t: Txn; date: string } | { k: 'date'; d: DateTx; date: string })[] = [
     ...list.map((t) => ({ k: 'txn' as const, t, date: t.date })),
     ...dates.map((d) => ({ k: 'date' as const, d, date: d.date })),

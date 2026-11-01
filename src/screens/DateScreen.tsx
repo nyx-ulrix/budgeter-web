@@ -5,7 +5,7 @@ import { useNav } from '../ui/nav'
 import { Body, Choice, FoldWindow, Glyph, KeyValue, Label, PixelButton, PixelDialog, PixelField, Rule, Small } from '../ui/components'
 import { store, useAppState } from '../data/store'
 import { AppState, Line, newId } from '../data/state'
-import { currency, periodOf, planFor } from '../data/ledger'
+import { currency, overspendsFor, periodOf, planFor } from '../data/ledger'
 import { editPlan } from '../data/actions'
 import { money, parseMoney, plain } from '../core/money'
 import { inPeriod, Period, todayIso } from '../core/budget'
@@ -104,6 +104,7 @@ export function DateTxnRow({ tx }: { tx: Tx }) {
   const [editing, setEditing] = useState(false)
   const expense = tx.kind === 'expense'
   const who = ds.budget?.names[tx.by] ?? (tx.by ? 'Partner' : 'Shared')
+  const charged = expense ? overspendsFor(st, tx, ds.txs.filter((x) => x.kind === 'expense')).reduce((a, t) => a + t.total, 0) : 0
   return (
     <>
       <Pressable role="button" aria-label={`Edit ${tx.note || 'date budget entry'}`} onPress={() => expense ? nav.go({ kind: 'expense', dateId: tx.id }) : setEditing(true)}
@@ -111,7 +112,7 @@ export function DateTxnRow({ tx }: { tx: Tx }) {
         <Glyph rows={Glyphs.heart} color={payerColor(ds.budget?.members, tx.by)} size={18} />
         <View style={{ flex: 1, gap: 4 }}>
           <Body>{tx.note || (expense ? 'Date' : 'Top up')}</Body>
-          <Small>{`${expense ? 'Date budget' : 'Top up'} · ${who}`}</Small>
+          <Small>{`${expense ? 'Date budget' : 'Top up'} · ${who}` + (charged > 0 ? ` · ${money(charged, cur)} over, from your budget` : '')}</Small>
         </View>
         <Text style={[Type.body, { color: expense ? Px.brown : Px.green }]}>{(expense ? '' : '+') + money(tx.amount, cur)}</Text>
       </Pressable>
@@ -156,13 +157,20 @@ function Connect() {
 /** Each month stands alone: what was added in [p] minus what was spent in it. Nothing carries over between months. */
 export const monthLeft = (all: Tx[], p: Period) => totals(all.filter((t) => inPeriod(p, t.date))).left
 
+/** The fund top-ups that covered expense [e]'s overspend ("Over budget: <note>", same day). */
+export const coverTopups = (all: Tx[], e: Tx): Tx[] =>
+  all.filter((t) => t.kind === 'topup' && t.date === e.date && t.note === `Over budget: ${e.note}`.slice(0, 100))
+
 /**
- * How far saving a date expense of [amount] on [date] (replacing [old] when editing) takes that month's fund below zero.
- * Months don't carry over, so only the expense's own month counts, as the fund shows it.
+ * The cover top-up a date expense of [amount] on [date] needs: how far it takes that month's fund below zero. Months
+ * don't carry over, so only its own month counts, as the fund shows it. When editing [old], its earlier cover top-ups
+ * are left out, since saving replaces them: an edit that lowers, moves or renames it gets the right cover too.
  */
 export function dateCover(st: AppState, all: Tx[], date: string, amount: number, old?: Tx): number {
   const p = periodOf(st, date)
-  return overdrawn(monthLeft(all, p), amount, old && inPeriod(p, old.date) ? old.amount : 0)
+  const replaced = new Set(old ? coverTopups(all, old).map((t) => t.id) : [])
+  const rest = all.filter((t) => !replaced.has(t.id))
+  return overdrawn(monthLeft(rest, p), amount, old && inPeriod(p, old.date) ? old.amount : 0)
 }
 
 /** The fund for the month picked in the Budget tab: that month's top-ups and spending. Months don't carry over. */
@@ -258,7 +266,7 @@ function AddWindow({ cur }: { cur: string }) {
 }
 
 /** The amount of a top-up. New ones are dated today; edits keep their date and note. */
-function TxForm({ cur, tx, kind: newKind = 'topup', onSave, onDone }: { cur: string; tx?: Tx; kind?: Tx['kind']; onSave: (d: Draft) => Promise<void>; onDone?: () => void }) {
+function TxForm({ cur, tx, kind: newKind = 'topup', onSave, onDone }: { cur: string; tx?: Tx; kind?: Tx['kind']; onSave: (d: Draft) => Promise<unknown>; onDone?: () => void }) {
   const kind = tx?.kind ?? newKind
   const [amount, setAmount] = useState(tx ? plain(tx.amount, cur) : '')
   const [busy, setBusy] = useState(false)

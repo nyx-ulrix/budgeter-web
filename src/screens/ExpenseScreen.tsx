@@ -1,11 +1,11 @@
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, Text, View } from 'react-native'
 import { Ai, parse } from '../ai/ai'
 import { todayIso, validDate } from '../core/budget'
 import { allocate, convert, money, parseMoney, plain } from '../core/money'
 import { ParsedReceipt, computedTotal, itemCosts, mismatch, parsedReceipt, receiptDate, receiptItem } from '../core/receipt'
 import { SPLIT_LABEL, SPLIT_METHODS, SplitMethod, itemShares, split } from '../core/split'
-import { deleteTxn, saveTxn } from '../data/actions'
+import { chargeOverspend, deleteTxn, dropOverspends, saveTxn } from '../data/actions'
 import { activeTrip, currency } from '../data/ledger'
 import { rate as fetchRate } from '../data/rates'
 import { AppState, ME, MEAL_CATEGORY, Meal, Txn, newId, normTxn, personId, personLabel } from '../data/state'
@@ -18,7 +18,7 @@ import { Screen, useNav } from '../ui/nav'
 import { Glyphs, Px, Type } from '../ui/theme'
 import { addTx, deleteTx, updateTx, useDate } from '../date/client'
 import { type Tx as DateTx } from '../date/money'
-import { dateCover } from './DateScreen'
+import { coverTopups, dateCover } from './DateScreen'
 const DATE = 'date' // Count toward: the shared date budget
 
 type ExpenseRoute = Extract<Screen, { kind: 'expense' }>
@@ -216,23 +216,37 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
 
   const [mealFor, setMealFor] = useState<Meal | null>(null) // "Save & add to macros": the meal to fill in after saving
 
+  const [saving, setSaving] = useState(false) // a date expense saves over the network: one tap, one save
+  const busy = useRef(false) // the state update lands after a fast second tap; this doesn't
+
   /** Saves; then [then] gets the saved expense's id (by default, go back). */
   function save(then: (id: string) => void = () => nav.back()) {
-    if (d.tripId === DATE) { // the shared date fund, not my budget; moving a normal expense there takes it out of my budget
+    if (d.tripId === DATE) {
+      if (busy.current) return
+      busy.current = true
+      setSaving(true) // the shared date fund, not my budget; moving a normal expense there takes it out of my budget
       const draft = { kind: 'expense' as const, amount: totalHome, note: (d.merchant.trim() || d.note.trim() || 'Date').slice(0, 100), date: d.date }
       // What this expense takes the fund below zero by, I paid: it tops the fund back up from my own budget.
       const cover = dateCover(st, ds.all, d.date, totalHome, dateTx)
+      const dates = ds.txs.filter((t) => t.kind === 'expense')
       ;(async () => {
-        await (dateTx ? updateTx(dateTx.id, draft) : addTx(draft))
+        // Saving replaces this expense's earlier cover top-ups; the cover is worked out afresh above.
+        if (dateTx) for (const t of coverTopups(ds.all, dateTx)) await deleteTx(t.id)
+        const id = dateTx ? (await updateTx(dateTx.id, draft), dateTx.id) : await addTx(draft)
         if (cover > 0) await addTx({ kind: 'topup', amount: cover, note: `Over budget: ${draft.note}`.slice(0, 100), date: draft.date })
-      })().then(() => {
+        return id
+      })().then((id) => {
         if (existing) store.update((x) => deleteTxn(x, existing.id))
-        if (cover > 0) store.update((x) => saveTxn(x, normTxn({ date: draft.date, total: cover, category: d.category, merchant: draft.note, note: 'Date budget overspend' })))
+        // The charge in my budget matches the cover: one, replaced on every save.
+        store.update((x) => chargeOverspend(x, { id, date: draft.date, note: draft.note }, cover, d.category, dateTx ?? undefined, dates))
         nav.back()
-      }).catch((e) => alert(e.message))
+      }).catch((e) => { busy.current = false; setSaving(false); alert(e.message) })
       return
     }
-    if (dateTx) deleteTx(dateTx.id).catch((e) => alert(e.message)) // moved out of the date budget into my own
+    if (dateTx) { // moved out of the date budget into my own: its cover top-ups and overspend charge go too
+      Promise.all([dateTx, ...coverTopups(ds.all, dateTx)].map((t) => deleteTx(t.id))).catch((e) => alert(e.message))
+      store.update((x) => dropOverspends(x, dateTx, ds.txs.filter((t) => t.kind === 'expense')))
+    }
     const t: Txn = {
       id: existing?.id ?? newId(),
       date: d.date,
@@ -417,7 +431,7 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
         </Side>
 
         {errors.map((e, i) => <Text key={i} style={[Type.small, { color: Px.red }]}>! {e}</Text>)}
-        <PixelButton text={editing ? 'Save changes' : 'Save expense'} onPress={() => save()} enabled={errors.length === 0} />
+        <PixelButton text={saving ? 'Saving…' : editing ? 'Save changes' : 'Save expense'} onPress={() => save()} enabled={errors.length === 0 && !saving} />
         {/* A meal (Food, not groceries) can go straight to Macros: save, then fill in what was eaten. */}
         {d.tripId !== DATE && (d.category === MEAL_CATEGORY || d.items.some((i) => i.category === MEAL_CATEGORY))
           && !(existing && st.meals.some((m) => m.txnId === existing.id)) && (
@@ -429,7 +443,12 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
         {existing && (
           <PixelButton text="Delete" kind="danger" onPress={() => { store.update((x) => deleteTxn(x, existing.id)); nav.back() }} />
         )}
-        {dateTx && <PixelButton text="Delete" kind="danger" onPress={() => { deleteTx(dateTx.id).catch((e) => alert(e.message)); nav.back() }} />}
+        {dateTx && <PixelButton text="Delete" kind="danger" onPress={() => {
+          // The fund's cover top-ups and my overspend charge go with the expense.
+          Promise.all([dateTx, ...coverTopups(ds.all, dateTx)].map((t) => deleteTx(t.id)))
+            .then(() => store.update((x) => dropOverspends(x, dateTx, ds.txs.filter((t) => t.kind === 'expense')))).catch((e) => alert(e.message))
+          nav.back()
+        }} />}
       </Page>
 
       {mealFor && <MealDialog st={st} meal={mealFor} onDone={() => { setMealFor(null); nav.back() }} />}

@@ -218,10 +218,13 @@ function IncomeWindow({ pkey, plan, cur }: { pkey: string; plan: Plan; cur: stri
   )
 }
 
+/** A fold of one kind of line, with the month's total in its title and under the list. */
 function LinesWindow({ title, kind, pkey, plan, cur, hint }: { title: string; kind: LineKind; pkey: string; plan: Plan; cur: string; hint: string }) {
+  const total = planTotal(plan, kind)
   return (
-    <FoldWindow title={title}>
+    <FoldWindow title={total > 0 ? `${title} · ${money(total, cur)}` : title}>
       <LineEditor kind={kind} pkey={pkey} plan={plan} cur={cur} />
+      {total > 0 && <KeyValue k={`Total in ${pkey}`} v={money(total, cur)} />}
       <Small>{hint}</Small>
     </FoldWindow>
   )

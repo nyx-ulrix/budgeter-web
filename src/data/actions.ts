@@ -1,5 +1,5 @@
 import { todayIso } from '../core/budget'
-import { periodOf, planFor, reserved, tripMonthly } from './ledger'
+import { OVERSPEND, overspendsFor, periodOf, planFor, reserved, tripMonthly } from './ledger'
 import { AppState, Line, Plan, Planned, Setup, SyncInfo, Trip, TripCost, Txn, myShare, normLine, normPlan, normTxn, normPlanned } from './state'
 
 /** Every state change the UI can make, as pure functions. The store stamps changed records after each one. */
@@ -173,6 +173,21 @@ export const deleteTrip = (s: AppState, id: string, now: number = Date.now()): A
   txns: s.txns.map((t) => (t.tripId === id ? tombstone(s, t, now) : t)).filter(notNull),
   plans: mapPlans(s.plans, (p) => ({ ...p, lines: p.lines.filter((l) => l.tripId !== id) })),
 })
+
+type DateRef = { id: string; date: string; note: string }
+
+/**
+ * Sets date expense [d]'s overspend charge in my budget to [amount] (none for 0): its earlier charges, found as [old]
+ * before an edit renamed or moved it, are replaced by one charge linked to it. Each save works it out afresh.
+ */
+export function chargeOverspend(s: AppState, d: DateRef, amount: number, category: string, old: DateRef = d, dates: DateRef[] = []): AppState {
+  const before = dropOverspends(dropOverspends(s, old, dates), d, dates)
+  return amount > 0 ? saveTxn(before, normTxn({ date: d.date, total: amount, category, merchant: d.note, note: OVERSPEND, dateId: d.id })) : before
+}
+
+/** Removes date expense [d]'s overspend charges from my budget. */
+export const dropOverspends = (s: AppState, d: DateRef, dates: DateRef[] = []): AppState =>
+  overspendsFor(s, d, dates).reduce((x, t) => deleteTxn(x, t.id), s)
 
 /** Ticks or unticks that [who] has paid their share of a split bill. */
 export const togglePaidBack = (s: AppState, txnId: string, who: string, now: number = Date.now()): AppState => ({

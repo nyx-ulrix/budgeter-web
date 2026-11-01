@@ -3,7 +3,7 @@ import {
   periodOfKey, today, todayIso,
 } from '../core/budget'
 import { allocate } from '../core/money'
-import { AppState, LINE_KINDS, LineKind, MEAL_CATEGORY, Meal, Plan, Trip, Txn, budgetImpact, myShare, normPlan, tripTarget } from './state'
+import { AppState, LINE_KINDS, LineKind, ME, MEAL_CATEGORY, Meal, Plan, Trip, Txn, budgetImpact, myShare, normPlan, tripTarget } from './state'
 import { macro, sumMacros } from '../core/macros'
 
 /** Derived numbers. Pure functions of AppState, so screens and widgets agree. */
@@ -58,6 +58,35 @@ export function savingsHistory(s: AppState, date: string = todayIso()): MonthSav
 /** Savings from the first month through [key], counting only months that have ended by [date]. */
 export const savedToDate = (s: AppState, key: string, date: string = todayIso()): number =>
   savingsHistory(s, date).filter((m) => m.key <= key).at(-1)?.total ?? 0
+
+/**
+ * What a bill took out of my bank: all of it if I paid, less the shares already paid back to me;
+ * my share once I've paid back whoever paid; nothing before that.
+ */
+export const cashOut = (t: Txn): number =>
+  t.payer === ME ? t.total - sum(t.paidBack.filter((w) => w !== ME).map((w) => t.shares[w] ?? 0))
+    : t.paidBack.includes(ME) ? myShare(t) : 0
+
+/**
+ * What should be in the bank at the end of [date], or undefined before a balance is entered: the balance the bank showed
+ * at the end of its day, plus the income, extra money and fixed costs after it, less what expenses after it took out.
+ * Income and undated lines land on their period's first day, dated lines on the day they were added. Money set aside
+ * (savings, reservations, trip funds) is still in the bank. Date budget expenses are paid from the "my share" fixed cost.
+ */
+export function bankBalance(s: AppState, date: string = todayIso()): number | undefined {
+  const bank = s.setup?.bank
+  if (!bank) return undefined
+  const after = (d: string) => d > bank.date && d <= date
+  let total = bank.amount
+  for (let p = periodOf(s, bank.date); p.start <= date; p = nextPeriod(p)) {
+    const plan = planFor(s, p.key)
+    if (after(p.start)) total += plan.income
+    for (const l of plan.lines) {
+      if ((l.kind === 'EXTRA' || l.kind === 'FIXED') && after(l.added ?? p.start)) total += l.kind === 'EXTRA' ? l.amount : -l.amount
+    }
+  }
+  return total - sum(liveTxns(s).filter((t) => after(t.date)).map(cashOut))
+}
 
 export const planTotal = (p: Plan, kind: LineKind): number => sum(p.lines.filter((l) => l.kind === kind).map((l) => l.amount))
 

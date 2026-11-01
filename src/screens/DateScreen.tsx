@@ -11,7 +11,7 @@ import { money, parseMoney, plain } from '../core/money'
 import { inPeriod, Period, todayIso } from '../core/budget'
 import { CLIENT_ID, loadGis } from '../sync/google'
 import { addTx, create, deleteTx, Draft, join, refresh, setPlan, signIn, updateTx, useDate } from '../date/client'
-import { currentStep, EVERY, Every, totals, Tx, withBudget } from '../date/money'
+import { currentStep, EVERY, Every, overdrawn, totals, Tx, withBudget } from '../date/money'
 
 declare const google: any
 
@@ -155,6 +155,15 @@ function Connect() {
 /** What's left in the shared fund at the end of [p] (today, for the month we're in): everything up to then carries over. */
 /** Each month stands alone: what was added in [p] minus what was spent in it. Nothing carries over between months. */
 export const monthLeft = (all: Tx[], p: Period) => totals(all.filter((t) => inPeriod(p, t.date))).left
+
+/**
+ * How far saving a date expense of [amount] on [date] (replacing [old] when editing) takes that month's fund below zero.
+ * Months don't carry over, so only the expense's own month counts, as the fund shows it.
+ */
+export function dateCover(st: AppState, all: Tx[], date: string, amount: number, old?: Tx): number {
+  const p = periodOf(st, date)
+  return overdrawn(monthLeft(all, p), amount, old && inPeriod(p, old.date) ? old.amount : 0)
+}
 
 /** The fund for the month picked in the Budget tab: that month's top-ups and spending. Months don't carry over. */
 function Fund({ cur, period }: { cur: string; period: Period }) {

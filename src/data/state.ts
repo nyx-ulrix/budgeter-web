@@ -41,7 +41,11 @@ export interface Setup {
   startDay: number // budget period starts on this day of the month (1–28)
   name: string
   avatar?: string // profile picture as a small JPEG data URL; synced with the phone through the setup record
+  bank?: Bank // a real bank balance to check the app's tally against
 }
+
+/** My bank balance as the bank showed it at the end of [date], in home minor units. */
+export interface Bank { amount: number; date: string }
 
 /**
  * One period's plan. Everything that changes spendable money is a Line, so reservations and trip funds
@@ -208,7 +212,8 @@ const set = (xs: string[] | null | undefined): string[] => [...new Set(xs ?? [])
 const rec = <T>(o: Record<string, T> | null | undefined): Record<string, T> => ({ ...(o ?? {}) })
 
 export const normSetup = (o: Loose<Setup>): Setup => ({
-  country: o.country ?? '', currency: o.currency ?? '', startDay: o.startDay ?? 1, name: o.name ?? '', ...(o.avatar ? { avatar: o.avatar } : {}) })
+  country: o.country ?? '', currency: o.currency ?? '', startDay: o.startDay ?? 1, name: o.name ?? '', ...(o.avatar ? { avatar: o.avatar } : {}),
+  ...(o.bank ? { bank: { amount: o.bank.amount ?? 0, date: o.bank.date ?? '' } } : {}) })
 
 export const normLine = (o: Loose<Line>): Line => ({
   id: o.id ?? newId(), kind: o.kind ?? 'EXTRA', name: o.name ?? '', amount: o.amount ?? 0,

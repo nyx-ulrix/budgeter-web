@@ -17,7 +17,8 @@ import {
 import { Screen, useNav } from '../ui/nav'
 import { Glyphs, Px, Type } from '../ui/theme'
 import { addTx, deleteTx, updateTx, useDate } from '../date/client'
-import { overdrawn, type Tx as DateTx } from '../date/money'
+import { type Tx as DateTx } from '../date/money'
+import { dateCover } from './DateScreen'
 const DATE = 'date' // Count toward: the shared date budget
 
 type ExpenseRoute = Extract<Screen, { kind: 'expense' }>
@@ -220,7 +221,7 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
     if (d.tripId === DATE) { // the shared date fund, not my budget; moving a normal expense there takes it out of my budget
       const draft = { kind: 'expense' as const, amount: totalHome, note: (d.merchant.trim() || d.note.trim() || 'Date').slice(0, 100), date: d.date }
       // What this expense takes the fund below zero by, I paid: it tops the fund back up from my own budget.
-      const cover = overdrawn(ds.left, totalHome, dateTx?.amount ?? 0)
+      const cover = dateCover(st, ds.all, d.date, totalHome, dateTx)
       ;(async () => {
         await (dateTx ? updateTx(dateTx.id, draft) : addTx(draft))
         if (cover > 0) await addTx({ kind: 'topup', amount: cover, note: `Over budget: ${draft.note}`.slice(0, 100), date: draft.date })
@@ -355,8 +356,8 @@ export function ExpenseScreen({ screen: s }: { screen: ExpenseRoute }) {
               }} />
             {d.tripId === DATE ? <>
               <Small>Goes to the shared date budget (your partner sees it), not your daily budget.</Small>
-              {overdrawn(ds.left, totalHome, dateTx?.amount ?? 0) > 0 && <Small color={Px.brown}>
-                The date budget is {money(overdrawn(ds.left, totalHome, dateTx?.amount ?? 0), home)} short, so that much comes out of your monthly budget.
+              {dateCover(st, ds.all, d.date, totalHome, dateTx) > 0 && <Small color={Px.brown}>
+                The date budget is {money(dateCover(st, ds.all, d.date, totalHome, dateTx), home)} short this month, so that much comes out of your monthly budget.
               </Small>}
             </>
               : d.tripId != null && <Small>Comes out of the trip fund, not your daily budget.</Small>}

@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { AppState, Loose, ME, Txn, budgetImpact, normLine, normPlan, normPlanned, normSetup, normState, normTrip, normTxn, normTxnItem } from './state'
-import { activeTrip, available, monthSaved, planFor, planSpendable, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
+import { activeTrip, available, monthSaved, planFor, planSpendable, bankBalance, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
 import { withReserved, buyNow, deletePlanned, deleteTxn, isSpentReserve, removeLine, saveTxn } from './actions'
 
 const setup = { country: 'SG', currency: 'SGD', startDay: 1, name: '' }
@@ -188,4 +188,31 @@ test('a bought item edited below its reservation frees the rest', () => {
   assert.equal(reserved(edited, 'p'), 30_000)
   assert.equal(spendable(edited, '2026-10'), 270_000)
   assert.equal(saveTxn(bought, { ...t, total: 60_000 }, 1).txns.find((x) => x.id === t.id)!.fromReserve, 50_000) // dearer: unchanged
+})
+
+test('bank balance: entered balance plus what moved after its day', () => {
+  const st = state({
+    setup: { ...setup, bank: { amount: 500_000, date: '2026-10-15' } },
+    plans: {
+      '2026-10': normPlan({ income: 300_000, lines: [
+        normLine({ kind: 'FIXED', name: 'Rent', amount: 100_000 }), // undated: on 1 Oct, already in the balance
+        normLine({ kind: 'EXTRA', name: 'Gift', amount: 5_000, added: '2026-10-20' }),
+        normLine({ kind: 'RESERVE', name: 'Shoes', amount: 9_000, plannedId: 'p', added: '2026-10-20' }), // still in the bank
+      ] }),
+    },
+    txns: [
+      txn({ date: '2026-10-10', total: 7_000 }), // before the balance: already in it
+      txn({ date: '2026-10-16', total: 2_000 }),
+      txn({ date: '2026-10-17', total: 9_000, people: 3, shares: { [ME]: 3_000, P2: 3_000, P3: 3_000 }, paidBack: ['P2'] }), // I paid; P2 paid me back
+      txn({ date: '2026-10-18', total: 4_000, people: 2, payer: 'P2', shares: { [ME]: 2_000, P2: 2_000 } }), // P2 paid; I haven't paid back
+      txn({ date: '2026-10-19', total: 6_000, tripId: 't' }), // trips still come out of the bank
+    ],
+  })
+  assert.equal(bankBalance(state({}), '2026-10-31'), undefined)
+  assert.equal(bankBalance(st, '2026-10-15'), 500_000)
+  assert.equal(bankBalance(st, '2026-10-31'), 500_000 + 5_000 - 2_000 - 6_000 - 6_000)
+  // November's plan (carried over) lands on 1 Nov: income in, rent out.
+  assert.equal(bankBalance(st, '2026-11-01'), 491_000 + 300_000 - 100_000)
+  const paidBack = { ...st, txns: st.txns.map((t) => (t.payer === 'P2' ? { ...t, paidBack: [ME] } : t)) }
+  assert.equal(bankBalance(paidBack, '2026-10-31'), 491_000 - 2_000) // my share leaves once I pay P2 back
 })

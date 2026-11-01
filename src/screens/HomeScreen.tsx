@@ -1,12 +1,13 @@
 import React, { useState } from 'react'
 import { Text, View } from 'react-native'
 import { addDays, Day, daysBetween, Pace, PACE_LABEL, todayIso } from '../core/budget'
-import { allocate, money } from '../core/money'
-import { activeTrip, currency, dailyImpact, liveTxns, snapshot, Snapshot, tripFund, tripSpent } from '../data/ledger'
+import { allocate, money, parseMoney, plain } from '../core/money'
+import { activeTrip, bankBalance, currency, dailyImpact, liveTxns, snapshot, Snapshot, tripFund, tripSpent } from '../data/ledger'
+import { editSetup } from '../data/actions'
 import { Planned } from '../data/state'
-import { useAppState } from '../data/store'
+import { store, useAppState } from '../data/store'
 import { useScanner } from '../ocr/scanner'
-import { ArtImg, Body, Chip, FoldWindow, Label, Page, PixelButton, PixelProgress, Small, Window, frame, Avatar, Side } from '../ui/components'
+import { ArtImg, Body, Chip, DateField, FoldWindow, Label, Page, PixelButton, PixelDialog, PixelField, PixelProgress, Small, Window, frame, Avatar, Side } from '../ui/components'
 import { MonthBar, Swatch } from '../ui/MonthBar'
 import { useNav } from '../ui/nav'
 import { Glyphs, Px, Type } from '../ui/theme'
@@ -78,6 +79,7 @@ export function HomeScreen() {
               : `${money(snap.left, cur)} left` + (snap.target > 0 ? ` · ${money(snap.target, cur)} kept for savings` : '')
         ) + ` · ${daysLeft} days to go · resets ${snap.period.end}`}</Small>
         {ds.phase === 'ready' && <Small>{`Date fund: ${money(monthLeft(ds.all, snap.period), cur)} left this month (shared, outside this budget)`}</Small>}
+        <BankRow />
       </Window>
 
       <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -149,6 +151,57 @@ function SavedUp({ snap, cur }: { snap: Snapshot; cur: string }) {
       {day.bonus > 0 && day.dailyLeft < 0 ? <Small>Using unused money today: {money(day.bonus - day.bonusLeft, cur)} of {money(day.bonus, cur)}.</Small>
         : day.bonus <= 0 ? <Small>Spend less than today's budget and the rest builds up here.</Small> : null}
     </View>
+  )
+}
+
+/**
+ * What should be in the bank by the app's tally, to check against the real balance. Hidden until tapped, every time
+ * Home opens, so it isn't on screen by accident.
+ */
+function BankRow() {
+  const st = useAppState()
+  const cur = currency(st)
+  const [shown, setShown] = useState(false)
+  const [editing, setEditing] = useState(false)
+  const bank = st.setup?.bank
+  const balance = bankBalance(st)
+  return (
+    <View style={{ gap: 4 }}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <Body style={{ flex: 1 }}>In the bank</Body>
+        {balance == null
+          ? <PixelButton text="Set" onPress={() => setEditing(true)} kind="secondary" />
+          : <>
+            <Text style={[Type.body, { color: balance < 0 ? Px.red : Px.brown }]}>{shown ? money(balance, cur) : '••••••'}</Text>
+            <PixelButton text={shown ? 'Hide' : 'Show'} onPress={() => setShown(!shown)} kind="secondary" />
+          </>}
+      </View>
+      {balance == null && <Small>Enter your bank balance once to check the app's tally against it.</Small>}
+      {shown && bank && <>
+        <Small>{`From your balance on ${bank.date}, plus income and extra money, less fixed costs and what you've paid since. Different from the bank? Something wasn't logged.`}</Small>
+        <PixelButton text="Update balance" onPress={() => setEditing(true)} kind="secondary" style={{ alignSelf: 'flex-start' }} />
+      </>}
+      {editing && <BankDialog onDismiss={() => setEditing(false)} />}
+    </View>
+  )
+}
+
+function BankDialog({ onDismiss }: { onDismiss: () => void }) {
+  const st = useAppState()
+  const cur = currency(st)
+  const [text, setText] = useState(() => (st.setup?.bank ? plain(bankBalance(st) ?? 0, cur) : ''))
+  const [date, setDate] = useState(todayIso())
+  const amount = parseMoney(text, cur)
+  return (
+    <PixelDialog title="Bank balance" onDismiss={onDismiss}>
+      <PixelField value={text} onChange={setText} label="Balance the bank shows" keyboard="decimal-pad" error={text !== '' && amount == null ? 'Not an amount' : undefined} />
+      <DateField label="At the end of" value={date} onChange={setDate} />
+      <Small>Log everything up to that day first. From then on the app adds income and takes off what you pay.</Small>
+      <PixelButton text="Save" enabled={amount != null} onPress={() => {
+        store.update((s) => editSetup(s, { ...s.setup!, bank: { amount: amount!, date } }))
+        onDismiss()
+      }} />
+    </PixelDialog>
   )
 }
 

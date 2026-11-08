@@ -22,6 +22,10 @@ export const addLine = (s: AppState, key: string, line: Line, today: string = to
 export const removeLine = (s: AppState, key: string, id: string): AppState =>
   editPlan(s, key, (p) => ({ ...p, lines: p.lines.filter((l) => l.id !== id || isSpentReserve(s, l)) }))
 
+/** Ticks or unticks a fixed cost as already deducted from the bank (ticked today). */
+export const togglePaid = (s: AppState, key: string, id: string, today: string = todayIso()): AppState =>
+  editPlan(s, key, (p) => ({ ...p, lines: p.lines.map((l) => (l.id !== id ? l : { ...l, paid: l.paid ? undefined : today })) }))
+
 /** A reservation whose item was bought (or is no longer planned): spent, not set aside. */
 export const isSpentReserve = (s: AppState, l: Line): boolean =>
   l.kind === 'RESERVE' && l.plannedId != null && !s.planned.some((p) => p.id === l.plannedId && p.status === 'OPEN')

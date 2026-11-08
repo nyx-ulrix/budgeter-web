@@ -77,6 +77,7 @@ export interface Line {
   tripId?: string
   added?: string // ISO day it was added; undefined = from the period's first day (carried over, or older data)
   tag?: string // 'date' = my monthly share of the shared date budget
+  paid?: string // a fixed cost: ISO day it was ticked as already deducted from the bank
 }
 
 export interface TxnItem {
@@ -218,7 +219,7 @@ export const normSetup = (o: Loose<Setup>): Setup => ({
 
 export const normLine = (o: Loose<Line>): Line => ({
   id: o.id ?? newId(), kind: o.kind ?? 'EXTRA', name: o.name ?? '', amount: o.amount ?? 0,
-  plannedId: opt(o.plannedId), tripId: opt(o.tripId), added: opt(o.added), tag: opt(o.tag),
+  plannedId: opt(o.plannedId), tripId: opt(o.tripId), added: opt(o.added), tag: opt(o.tag), paid: opt(o.paid),
 })
 
 export const normPlan = (o: Loose<Plan> = {}): Plan => ({

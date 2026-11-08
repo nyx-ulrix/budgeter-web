@@ -42,7 +42,7 @@ export function planFor(s: AppState, key: string): Plan {
   const prev = Object.keys(s.plans).filter((k) => k < key).sort().pop()
   if (prev == null) return normPlan()
   const p = s.plans[prev]
-  return { income: p.income, lines: p.lines.filter((l) => l.kind === 'FIXED' || l.kind === 'SAVINGS').map((l) => ({ ...l, added: undefined })), caps: p.caps, budget: p.budget, savingsTarget: p.savingsTarget }
+  return { income: p.income, lines: p.lines.filter((l) => l.kind === 'FIXED' || l.kind === 'SAVINGS').map((l) => ({ ...l, added: undefined, paid: undefined })), caps: p.caps, budget: p.budget, savingsTarget: p.savingsTarget }
 }
 
 /**
@@ -99,10 +99,14 @@ export function bankStart(s: AppState): string {
 /**
  * What should be in the bank at the end of [date], or undefined before a balance is entered: the balance the bank showed
  * at the end of its day, plus the income, extra money and fixed costs after it, less what expenses after it took out.
- * Income and undated lines land on their period's first day, dated lines on the day they were added. Money set aside
- * (savings, reservations, trip funds) is still in the bank. Date budget expenses are paid from the "my share" fixed cost.
+ * Income and undated lines land on their period's first day, dated lines on the day they were added. A fixed cost in
+ * a month that hasn't ended counts only once it's ticked as deducted, on the day it was ticked. Money set aside
+ * (savings, reservations, trip funds) is still in the bank.
+ * With [dates] (the date budget expenses I paid, once the date budget has loaded), those come off on their days, and
+ * my monthly share and the overspend charges don't: they're how the budget counts that money, not bank movements.
+ * Without it, my share and the charges stand in for date spending.
  */
-export function bankBalance(s: AppState, date: string = todayIso()): number | undefined {
+export function bankBalance(s: AppState, date: string = todayIso(), dates?: { date: string; amount: number }[]): number | undefined {
   const bank = s.setup?.bank
   if (!bank) return undefined
   const after = (d: string) => d > bank.date && d <= date
@@ -110,11 +114,14 @@ export function bankBalance(s: AppState, date: string = todayIso()): number | un
   for (let p = periodOf(s, bank.date); p.start <= date; p = nextPeriod(p)) {
     const plan = planFor(s, p.key)
     if (after(p.start)) total += plan.income
+    const ended = p.end <= date
     for (const l of plan.lines) {
-      if ((l.kind === 'EXTRA' || l.kind === 'FIXED') && after(l.added ?? p.start)) total += l.kind === 'EXTRA' ? l.amount : -l.amount
+      if (l.kind === 'EXTRA' && after(l.added ?? p.start)) total += l.amount
+      if (l.kind === 'FIXED' && !(dates && l.tag === 'date') && (l.paid != null ? after(l.paid) : ended && after(l.added ?? p.start))) total -= l.amount
     }
   }
-  return total - sum(liveTxns(s).filter((t) => after(t.date)).map(cashOut))
+  const paid = liveTxns(s).filter((t) => after(t.date) && !(dates && t.note === OVERSPEND))
+  return total - sum(paid.map(cashOut)) - sum((dates ?? []).filter((d) => after(d.date)).map((d) => d.amount))
 }
 
 export const planTotal = (p: Plan, kind: LineKind): number => sum(p.lines.filter((l) => l.kind === kind).map((l) => l.amount))

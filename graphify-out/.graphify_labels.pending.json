@@ -1,15 +1,14 @@
 {
-  "2": "client.ts",
-  "4": "HomeScreen.tsx",
+  "0": "App.tsx",
+  "2": "scanner.tsx",
+  "4": "TripScreen.tsx",
   "5": "ExpenseScreen.tsx",
-  "6": "records.ts",
+  "6": "state.ts",
   "9": "package.json",
   "10": "expo",
   "11": "core.test.ts",
-  "12": "DateScreen.tsx",
-  "13": "actions.ts",
-  "14": "store.ts",
-  "15": "state.ts",
-  "17": "newId",
-  "19": "core/money.ts"
+  "12": "nav.tsx",
+  "13": "devDependencies",
+  "14": "scripts",
+  "19": "HomeScreen.tsx"
 }

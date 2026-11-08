@@ -3,7 +3,7 @@ import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { AppState, Loose, ME, Txn, budgetImpact, normLine, normPlan, normPlanned, normSetup, normState, normTrip, normTxn, normTxnItem } from './state'
 import { activeTrip, available, dailyAverage, monthSaved, perDayLeft, planFor, planSpendable, bankBalance, bankSavings, bankStart, OVERSPEND, overspendsFor, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
-import { withReserved, buyNow, chargeOverspend, deletePlanned, deleteTxn, dropOverspends, isSpentReserve, removeLine, saveTxn } from './actions'
+import { withReserved, buyNow, chargeOverspend, deletePlanned, deleteTxn, dropOverspends, isSpentReserve, removeLine, saveTxn, togglePaid } from './actions'
 
 const setup = { country: 'SG', currency: 'SGD', startDay: 1, name: '' }
 const oct5 = '2026-10-05'
@@ -219,8 +219,12 @@ test('bank balance: entered balance plus what moved after its day', () => {
   assert.equal(bankSavings(started, '2026-10-20'), 100_000) // October hasn't ended: none of it counts yet
   assert.equal(bankBalance(st, '2026-10-15'), 500_000)
   assert.equal(bankBalance(st, '2026-10-31'), 500_000 + 5_000 - 2_000 - 6_000 - 6_000)
-  // November's plan (carried over) lands on 1 Nov: income in, rent out.
-  assert.equal(bankBalance(st, '2026-11-01'), 491_000 + 300_000 - 100_000)
+  // November's plan (carried over): income lands on 1 Nov; rent comes off only once ticked as deducted.
+  assert.equal(bankBalance(st, '2026-11-01'), 491_000 + 300_000)
+  const rent = planFor(st, '2026-11').lines[0].id
+  assert.equal(bankBalance(togglePaid(st, '2026-11', rent, '2026-11-03'), '2026-11-05'), 491_000 + 300_000 - 100_000)
+  assert.equal(bankBalance(togglePaid(st, '2026-11', rent, '2026-11-03'), '2026-11-02'), 491_000 + 300_000) // ticked after that day
+  assert.equal(bankBalance(st, '2026-12-01'), 491_000 + 300_000 - 100_000 + 300_000) // November ended: its rent counts, December's not yet
   const paidBack = { ...st, txns: st.txns.map((t) => (t.payer === 'P2' ? { ...t, paidBack: [ME] } : t)) }
   assert.equal(bankBalance(paidBack, '2026-10-31'), 491_000 - 2_000) // my share leaves once I pay P2 back
 })
@@ -240,4 +244,20 @@ test('a date expense has at most one overspend charge, replaced on every save', 
   const fresh = chargeOverspend(state({}), dinner, 1_300, 'Food')
   assert.deepEqual(overspendsFor(fresh, dinner).map((t) => [t.total, t.note, t.dateId]), [[1_300, OVERSPEND, 'd1']])
   assert.deepEqual(overspendsFor(dropOverspends(fresh, dinner), dinner), [])
+})
+
+test('bank balance counts the date expenses I paid', () => {
+  const st = state({
+    setup: { ...setup, bank: { amount: 50_000, date: '2026-09-30' } },
+    plans: { '2026-10': normPlan({ income: 75_000, lines: [normLine({ kind: 'FIXED', name: 'Date budget (my share)', amount: 15_000, tag: 'date' })] }) },
+    txns: [txn({ date: '2026-10-31', total: 1_300, merchant: 'sweet cheeks', note: OVERSPEND }), txn({ date: '2026-10-20', total: 2_000 })],
+  })
+  const paid = [{ date: '2026-10-31', amount: 7_000 }, { date: '2026-11-02', amount: 650 }]
+  // Without the date budget loaded, the overspend charge stands in for date spending (my share isn't ticked yet).
+  assert.equal(bankBalance(st, '2026-10-31'), 50_000 + 75_000 - 1_300 - 2_000)
+  // With it, the 70 dinner I paid comes off instead; the 6.50 after the day asked isn't counted yet.
+  assert.equal(bankBalance(st, '2026-10-31', paid), 50_000 + 75_000 - 2_000 - 7_000)
+  // Once October has ended its fixed costs count, but my date share never does when the date expenses are known.
+  assert.equal(bankBalance(st, '2026-11-01', paid) , 50_000 + 75_000 - 2_000 - 7_000 + 75_000)
+  assert.equal(bankBalance(st, '2026-11-01'), 50_000 + 75_000 - 1_300 - 2_000 - 15_000 + 75_000)
 })

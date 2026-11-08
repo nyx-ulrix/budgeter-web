@@ -163,8 +163,10 @@ function BankRow() {
   const cur = currency(st)
   const [shown, setShown] = useState(false)
   const [editing, setEditing] = useState(false)
+  const ds = useDate()
   const bank = st.setup?.bank
-  const balance = bankBalance(st)
+  // Date expenses come out of my bank: the ones I paid, once the date budget has loaded.
+  const balance = bankBalance(st, todayIso(), ds.phase === 'ready' ? ds.txs.filter((t) => t.kind === 'expense' && t.by === ds.uid) : undefined)
   return (
     <View style={{ gap: 4 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -203,7 +205,7 @@ function BankDialog({ onDismiss }: { onDismiss: () => void }) {
       <PixelField value={text} onChange={setText} label={`In the bank at the end of ${start}`} keyboard="decimal-pad" error={text !== '' && amount == null ? 'Not an amount' : undefined} />
       <Small>What you had before you started Budgeter. Every month since adds its income and extra money and takes off its fixed costs and everything you paid, so the total should match your bank.</Small>
       <PixelButton text="Save" enabled={amount != null} onPress={() => {
-        store.update((s) => editSetup(s, { ...s.setup!, bank: { amount: amount!, date: start } }))
+        store.update((s) => editSetup(s, { ...s.setup!, bank: { ...s.setup!.bank, amount: amount!, date: start } }))
         onDismiss()
       }} />
     </PixelDialog>

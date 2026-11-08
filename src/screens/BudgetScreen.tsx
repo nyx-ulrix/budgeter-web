@@ -1,8 +1,8 @@
 import React, { useState } from 'react'
-import { Text, View } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
 import { addDays, daysBetween, nextPeriod, prevPeriod, todayIso } from '../core/budget'
 import { digits, div, money, parseMoney, plain } from '../core/money'
-import { addLine, editPlan, removeLine, setReserved, isSpentReserve } from '../data/actions'
+import { addLine, editPlan, removeLine, setReserved, isSpentReserve, togglePaid } from '../data/actions'
 import {
   available, currency, dailyAverage, monthSaved, perDayLeft, periodFromKey, periodOf, planFor, planTotal, reserved, savedToDate, savingsHistory, snapshot, spendable, spent,
 } from '../data/ledger'
@@ -237,7 +237,18 @@ function LinesWindow({ title, kind, pkey, plan, cur, hint }: { title: string; ki
     <FoldWindow title={total > 0 ? `${title} · ${money(total, cur)}` : title}>
       <LineEditor kind={kind} pkey={pkey} plan={plan} cur={cur} />
       <Small>{hint}</Small>
+      {kind === 'FIXED' && <Small>Tick a cost once it has been deducted from your bank. This month, only ticked ones come off "In the bank".</Small>}
     </FoldWindow>
+  )
+}
+
+/** A fixed cost's "already deducted from the bank" tick: only ticked ones come off "In the bank" this month. */
+function PaidBox({ paid, name, onPress }: { paid: boolean; name: string; onPress: () => void }) {
+  return (
+    <Pressable role="checkbox" aria-checked={paid} aria-label={`${name} deducted already`} onPress={onPress}
+      style={{ width: 28, height: 28, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: Px.brown, backgroundColor: paid ? Px.green : Px.creamLight }}>
+      {paid && <Text style={[Type.label, { color: Px.creamLight }]}>✓</Text>}
+    </Pressable>
   )
 }
 
@@ -248,7 +259,8 @@ function LineEditor({ kind, pkey, plan, cur }: { kind: LineKind; pkey: string; p
   const v = parseMoney(amount, cur)
   return <>
     {plan.lines.filter((l) => l.kind === kind).map((l) => (
-      <View key={l.id} style={row}>
+      <View key={l.id} style={{ ...row, gap: 8 }}>
+        {kind === 'FIXED' && <PaidBox paid={!!l.paid} name={l.name} onPress={() => store.update((s) => togglePaid(s, pkey, l.id))} />}
         <Body style={{ flex: 1 }}>{l.name}</Body>
         <Text style={Type.body}>{money(l.amount, cur)}</Text>
         <CloseButton onPress={() => store.update((s) => removeLine(s, pkey, l.id))} />

@@ -2,11 +2,11 @@ import React, { createElement, useEffect, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, Text, View } from 'react-native'
 import { Glyphs, Px, Type } from '../ui/theme'
 import { useNav } from '../ui/nav'
-import { Body, Choice, FoldWindow, Glyph, KeyValue, Label, PixelButton, PixelDialog, PixelField, Rule, Small } from '../ui/components'
+import { Body, Choice, DateField, FoldWindow, Glyph, KeyValue, Label, PixelButton, PixelDialog, PixelField, Rule, Small } from '../ui/components'
 import { store, useAppState } from '../data/store'
-import { AppState, Line, newId } from '../data/state'
-import { currency, overspendsFor, periodOf, planFor } from '../data/ledger'
-import { editPlan } from '../data/actions'
+import { AppState, Line, newId, normTxn } from '../data/state'
+import { DATE_TRANSFER, currency, dateContributions, overspendsFor, periodOf, planFor } from '../data/ledger'
+import { editPlan, saveTxn } from '../data/actions'
 import { money, parseMoney, plain } from '../core/money'
 import { inPeriod, Period, todayIso } from '../core/budget'
 import { CLIENT_ID, loadGis } from '../sync/google'
@@ -15,19 +15,22 @@ import { currentStep, EVERY, Every, overdrawn, totals, Tx, withBudget } from '..
 
 declare const google: any
 
-/** The personal budget line that sets aside my share of the date budget each month (a fixed cost, carried over). */
+/** The personal budget line that sets money aside for dates each month (a set-aside, carried over; tag 'date'). */
 export const dateLine = (st: AppState, key = periodOf(st).key): Line | undefined => planFor(st, key).lines.find((l) => l.tag === 'date')
 
 /** What the shared budget adds per month on average: weekly ×52/12, fortnightly ×26/12. */
 const monthly = (amount: number, every: Every) => Math.round(every === 'week' ? (amount * 52) / 12 : every === 'fortnight' ? (amount * 26) / 12 : amount)
 
-/** Sets my monthly share as a "Date budget" fixed cost from this month on (replacing any earlier amount this month). */
-function setMyShare(amount: number) {
+/** Half the pool, rounded up: what's set aside in my budget until I choose another amount. */
+const half = (amount: number) => Math.ceil(amount / 2)
+
+/** Sets [amount] aside for dates in my budget from this month on (replacing any earlier amount this month). Not a bank movement. */
+function setPoolAside(amount: number) {
   store.update((st) => {
     const key = periodOf(st).key
     return editPlan(st, key, (p) => ({
       ...p,
-      lines: [...p.lines.filter((l) => l.tag !== 'date'), ...(amount > 0 ? [{ id: newId(), kind: 'FIXED' as const, name: 'Date budget (my share)', amount, tag: 'date', added: todayIso() }] : [])],
+      lines: [...p.lines.filter((l) => l.tag !== 'date'), ...(amount > 0 ? [{ id: newId(), kind: 'RESERVE' as const, name: 'Date budget', amount, tag: 'date', added: todayIso() }] : [])],
     }))
   })
 }
@@ -70,11 +73,11 @@ export function DateBudgetFold({ period }: { period: Period }) {
   useDateRefresh()
   useEffect(() => {
     if (ds.phase !== 'ready' || !ds.uid) return
-    const partner = ds.budget!.members.find((m) => m !== ds.uid)
-    const { step, mine } = contributions(ds.budget!.plan, ds.uid, partner)
-    if (!(step as any)?.split) return // no agreed split yet: leave my set-aside alone
-    const want = monthly(mine, step!.every)
-    if ((dateLine(store.get())?.amount ?? 0) !== want) setMyShare(want)
+    // A set-aside for dates in my budget: half the pool to start with (it used to be my share, as a fixed cost).
+    // Once there is one, its amount is mine to set (Pool → Set aside), so the pool changing doesn't touch it.
+    const step = currentStep(ds.budget!.plan, todayIso())
+    const line = dateLine(store.get())
+    if (step && step.amount > 0 && (!line || line.kind !== 'RESERVE')) setPoolAside(half(monthly(step.amount, step.every)))
   }, [ds.budget])
   return (
     <FoldWindow title={ds.phase === 'ready' ? `Date budget · ${money(monthLeft(ds.all, period), cur)} left` : 'Date budget'}>
@@ -174,6 +177,36 @@ export function dateCover(st: AppState, all: Tx[], date: string, amount: number,
 }
 
 /** The fund for the month picked in the Budget tab: that month's top-ups and spending. Months don't carry over. */
+/**
+ * Who has put what into the pool this month: the date expenses each of us paid, with my partner's transfers to me
+ * on their side. A transfer adds to "In the bank" (it's a negative expense), not to my budget.
+ */
+function Contributions({ cur, period, partnerName }: { cur: string; period: Period; partnerName: string }) {
+  const st = useAppState()
+  const ds = useDate()
+  const c = dateContributions(st, period, ds.txs, ds.uid!)
+  const [text, setText] = useState('')
+  const [date, setDate] = useState(todayIso())
+  const v = text.trim() ? parseMoney(text, cur) : null
+  return (
+    <View style={{ gap: 6 }}>
+      <Label>Put in this month</Label>
+      <KeyValue k="You" v={money(c.mine, cur)} />
+      <KeyValue k={partnerName} v={money(c.theirs, cur)} />
+      <Small>{`You paid ${money(c.iPaid, cur)} of date spending, ${partnerName} ${money(c.theyPaid, cur)}` + (c.transferred ? `, and ${partnerName} transferred you ${money(c.transferred, cur)}.` : '.')}</Small>
+      <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
+        <PixelField value={text} onChange={setText} label={`${partnerName} transferred me`} keyboard="decimal-pad" placeholder="0.00" style={{ flex: 1 }}
+          error={text.trim() !== '' && (v == null || v <= 0) ? 'Not an amount' : null} />
+        <PixelButton text="Add" enabled={v != null && v > 0} onPress={() => {
+          store.update((s) => saveTxn(s, normTxn({ date, total: -v!, category: 'Other', merchant: `From ${partnerName}`, note: DATE_TRANSFER })))
+          setText('')
+        }} />
+      </View>
+      <DateField label="Transferred on" value={date} onChange={setDate} />
+    </View>
+  )
+}
+
 function Fund({ cur, period }: { cur: string; period: Period }) {
   const ds = useDate()
   const b = ds.budget!
@@ -187,6 +220,7 @@ function Fund({ cur, period }: { cur: string; period: Period }) {
       <Text style={[Type.hero, { color: left < 0 ? Px.red : Px.brown }]}>{money(left, cur)}</Text>
       <KeyValue k={`Added in ${period.key}`} v={money(month.topped, cur)} />
       <KeyValue k={`Spent in ${period.key}`} v={money(month.spent, cur)} />
+      {partner && <Contributions cur={cur} period={period} partnerName={b.names[partner] ?? 'Your partner'} />}
       <Rule />
       {partner
         ? <Small>Shared with {b.names[partner] ?? 'your partner'}.</Small>
@@ -202,55 +236,38 @@ function Fund({ cur, period }: { cur: string; period: Period }) {
   )
 }
 
-/** Who puts in what: the current step's split (keys are uids; "partner" until the partner has joined). */
-export function contributions(plan: unknown, uid: string, partnerUid: string | undefined) {
-  const step = currentStep(plan, todayIso())
-  const split: Record<string, number> = (step as any)?.split ?? {}
-  const amount = step?.amount ?? 0
-  const mine = Number.isSafeInteger(split[uid]) ? split[uid] : Math.ceil(amount / 2)
-  const theirs = Number.isSafeInteger(split[partnerUid ?? '']) ? split[partnerUid!] : Number.isSafeInteger(split.partner) ? split.partner : amount - mine
-  return { step, mine, theirs }
-}
-
-/**
- * The recurring budget for both of you: each person's contribution, added together every week, 2 weeks or month.
- * The split rides along on the plan step (DateBudget ignores it), and my part becomes my monthly set-aside.
- */
+/** The recurring pool for both of you, added every week, 2 weeks or month, and what I set aside for it in my budget each month. */
 function PlanWindow({ cur }: { cur: string }) {
   const ds = useDate()
   const b = ds.budget!
-  const partner = b.members.find((m) => m !== ds.uid)
-  const partnerName = partner ? b.names[partner] ?? 'Your partner' : 'Your partner'
-  const { step, mine: m0, theirs: t0 } = contributions(b.plan, ds.uid!, partner)
-  const [mine, setMine] = useState(step ? plain(m0, cur) : '')
-  const [theirs, setTheirs] = useState(step ? plain(t0, cur) : '')
+  const step = currentStep(b.plan, todayIso())
+  const [amount, setAmount] = useState(step ? plain(step.amount, cur) : '')
   const [every, setEvery] = useState<Every>(step?.every ?? 'month')
   const [day, setDay] = useState(String(step?.day ?? 1))
+  const st = useAppState()
+  const line = dateLine(st)
+  const [aside, setAside] = useState(line?.kind === 'RESERVE' ? plain(line.amount, cur) : '')
   const [err, setErr] = useState<string | null>(null)
-  const mv = mine.trim() ? parseMoney(mine, cur) : 0
-  const tv = theirs.trim() ? parseMoney(theirs, cur) : 0
+  const v = amount.trim() ? parseMoney(amount, cur) : 0
+  const a = aside.trim() ? parseMoney(aside, cur) : null // blank: half the pool
   const d = Number(day)
-  const ok = mv != null && tv != null && mv >= 0 && tv >= 0 && (every !== 'month' || (Number.isInteger(d) && d >= 1 && d <= 31))
-  const total = (mv ?? 0) + (tv ?? 0)
-  const per = `every ${EVERY[every]}`
+  const ok = v != null && v >= 0 && (aside.trim() === '' || (a != null && a >= 0)) && (every !== 'month' || (Number.isInteger(d) && d >= 1 && d <= 31))
   return (
-    <Section title="Budget for both of you">
+    <Section title="Pool">
       <Small>{step && step.amount > 0
-        ? `${money(step.amount, cur)} is added every ${EVERY[step.every]}${step.every === 'month' ? ` on day ${step.day ?? 1}` : ' (on Monday)'}: you ${money(m0, cur)}, ${partnerName} ${money(t0, cur)}.`
-        : 'No recurring budget yet.'}</Small>
-      <PixelField value={mine} onChange={setMine} label={`You put in (${cur})`} keyboard="decimal-pad" placeholder="0.00" error={mv == null ? 'Not a number' : null} />
-      <PixelField value={theirs} onChange={setTheirs} label={`${partnerName} puts in (${cur})`} keyboard="decimal-pad" placeholder="0.00" error={tv == null ? 'Not a number' : null} />
+        ? `${money(step.amount, cur)} is added every ${EVERY[step.every]}${step.every === 'month' ? ` on day ${step.day ?? 1}` : ' (on Monday)'}; you set ${money(line?.kind === 'RESERVE' ? line.amount : 0, cur)} aside in your budget each month.`
+        : 'No recurring pool yet.'}</Small>
+      <PixelField value={amount} onChange={setAmount} label={`Pool (${cur})`} keyboard="decimal-pad" placeholder="0.00" error={v == null ? 'Not a number' : null} />
       <Choice options={['week', 'fortnight', 'month'] as Every[]} selected={every} label={(e) => `Every ${EVERY[e]}`} onSelect={setEvery} />
       {every === 'month' && <PixelField value={day} onChange={(s) => setDay(s.replace(/\D/g, '').slice(0, 2))} label="On day (1-31)" keyboard="number-pad" />}
-      <KeyValue k={`Total ${per}`} v={money(total, cur)} />
+      <PixelField value={aside} onChange={setAside} label={`Set aside in my budget each month (${cur})`} keyboard="decimal-pad"
+        placeholder={plain(half(monthly(v ?? 0, every)), cur)} error={aside.trim() !== '' && a == null ? 'Not a number' : null} />
       <PixelButton text="Save" enabled={ok} onPress={() => {
         setErr(null)
-        const plan = withBudget(b.plan, todayIso(), total, every, every === 'month' ? d : 1)
-        const last = plan[plan.length - 1] as any
-        last.split = { [ds.uid!]: mv!, [partner ?? 'partner']: tv! }
-        setPlan(plan).then(() => setMyShare(monthly(mv!, every))).catch((e) => setErr(e.message))
+        const keep = a ?? half(monthly(v!, every)) // blank: half the pool
+        setPlan(withBudget(b.plan, todayIso(), v!, every, every === 'month' ? d : 1)).then(() => setPoolAside(keep)).catch((e) => setErr(e.message))
       }} />
-      <Small>Starts with the current period; earlier ones keep what they had. Set both to 0 to stop. For one-off extras, add a top-up.</Small>
+      <Small>Starts with the current period; earlier ones keep what they had. Set it to 0 to stop. For one-off extras, add a top-up.</Small>
       {err && <Small color={Px.red}>! {err}</Small>}
     </Section>
   )

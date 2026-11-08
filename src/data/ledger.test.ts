@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { AppState, Loose, ME, Txn, budgetImpact, normLine, normPlan, normPlanned, normSetup, normState, normTrip, normTxn, normTxnItem } from './state'
-import { activeTrip, available, dailyAverage, monthSaved, perDayLeft, planFor, planSpendable, bankBalance, bankSavings, bankStart, OVERSPEND, overspendsFor, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
+import { DATE_TRANSFER, activeTrip, available, dateContributions, periodFromKey, dailyAverage, monthSaved, perDayLeft, planFor, planSpendable, bankBalance, bankSavings, bankStart, OVERSPEND, overspendsFor, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
 import { withReserved, buyNow, chargeOverspend, deletePlanned, deleteTxn, dropOverspends, isSpentReserve, removeLine, saveTxn, togglePaid } from './actions'
 
 const setup = { country: 'SG', currency: 'SGD', startDay: 1, name: '' }
@@ -260,4 +260,25 @@ test('bank balance counts the date expenses I paid', () => {
   // Once October has ended its fixed costs count, but my date share never does when the date expenses are known.
   assert.equal(bankBalance(st, '2026-11-01', paid) , 50_000 + 75_000 - 2_000 - 7_000 + 75_000)
   assert.equal(bankBalance(st, '2026-11-01'), 50_000 + 75_000 - 1_300 - 2_000 - 15_000 + 75_000)
+})
+
+test('date pool: set aside every month, contributions by who paid, transfers to me', () => {
+  const pool = normLine({ kind: 'RESERVE', name: 'Date budget', amount: 30_000, tag: 'date' })
+  const st = state({
+    setup: { ...setup, bank: { amount: 0, date: '2026-09-30' } },
+    plans: { '2026-10': normPlan({ income: 100_000, lines: [pool] }) },
+    txns: [txn({ date: '2026-10-25', total: -15_000, merchant: 'From Fang', note: DATE_TRANSFER })],
+  })
+  assert.deepEqual(planFor(st, '2026-11').lines.map((l) => [l.kind, l.amount, l.tag]), [['RESERVE', 30_000, 'date']]) // carried over
+  assert.equal(spendable(st, '2026-10'), 100_000 - 30_000) // set aside, not spendable
+  assert.equal(monthSaved(st, '2026-10'), 100_000 - 30_000) // nor saved; the transfer doesn't count as spending or income
+  const dates = [
+    { date: '2026-10-04', amount: 20_000, kind: 'expense', by: 'me' },
+    { date: '2026-10-10', amount: 4_000, kind: 'expense', by: 'fang' },
+    { date: '2026-10-01', amount: 30_000, kind: 'topup', by: '' },
+  ]
+  const c = dateContributions(st, periodFromKey(st, '2026-10'), dates, 'me')
+  assert.deepEqual(c, { iPaid: 20_000, theyPaid: 4_000, transferred: 15_000, mine: 5_000, theirs: 19_000 })
+  // The bank: income 1,000 − the 200 date expense I paid + the 150 she transferred.
+  assert.equal(bankBalance(st, '2026-10-31', dates.filter((d) => d.kind === 'expense' && d.by === 'me')), 100_000 - 20_000 + 15_000)
 })

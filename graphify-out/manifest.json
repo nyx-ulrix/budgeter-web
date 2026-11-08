@@ -102,15 +102,15 @@
     "semantic_hash": "be915eab954989f6715a940c4d86e74e"
   },
   "src/data/ledger.test.ts": {
-    "mtime": 1794099044.6399608,
-    "seen": 1794099118.0019453,
-    "ast_hash": "78064b2a3a6cd33a90a68ae761062bf5",
+    "mtime": 1794099671.8678117,
+    "seen": 1794100046.8390594,
+    "ast_hash": "598fc5f55e0625d2e0ef21971ce1e6b8",
     "semantic_hash": ""
   },
   "src/data/ledger.ts": {
-    "mtime": 1794099044.6395738,
-    "seen": 1794099118.0019467,
-    "ast_hash": "f9ce5d65997e56e2a9ff9ed6c11837ba",
+    "mtime": 1794099641.4496078,
+    "seen": 1794100046.839061,
+    "ast_hash": "81c01c78f634f3caaea086374355a07a",
     "semantic_hash": ""
   },
   "src/data/rates.ts": {
@@ -360,9 +360,9 @@
     "semantic_hash": "ac1e4ec9a913981df08337b7e7cceeee"
   },
   "src/screens/DateScreen.tsx": {
-    "mtime": 1793499887.1126652,
-    "seen": 1793499980.1533668,
-    "ast_hash": "4e03c1b9b2ce666bc5c5da5b9c2ecc1c",
+    "mtime": 1794099894.2213845,
+    "seen": 1794100046.8390732,
+    "ast_hash": "8a2897f92d84d71feb0962baad7d99bf",
     "semantic_hash": ""
   },
   "src/ai/food.test.ts": {

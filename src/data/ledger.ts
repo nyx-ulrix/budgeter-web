@@ -18,6 +18,21 @@ export const periodFromKey = (s: AppState, key: string): Period => periodOfKey(k
 
 export const liveTxns = (s: AppState): Txn[] => s.txns.filter((t) => !t.deleted)
 
+/** The note on money my partner transferred to me for date spending: a negative expense, so it adds to the bank only. */
+export const DATE_TRANSFER = 'Date budget transfer'
+
+/**
+ * What each of us put into the date pool in [p]: the date expenses each paid, with my partner's transfers to me moved
+ * from my side to theirs. [dates] is the date budget's entries; [me] my uid.
+ */
+export function dateContributions(s: AppState, p: Period, dates: { date: string; amount: number; kind: string; by: string }[], me: string) {
+  const inP = dates.filter((d) => d.kind === 'expense' && inPeriod(p, d.date))
+  const transferred = -sum(liveTxns(s).filter((t) => t.note === DATE_TRANSFER && inPeriod(p, t.date)).map((t) => t.total))
+  const iPaid = sum(inP.filter((d) => d.by === me).map((d) => d.amount))
+  const theyPaid = sum(inP.filter((d) => d.by !== me).map((d) => d.amount))
+  return { iPaid, theyPaid, transferred, mine: iPaid - transferred, theirs: theyPaid + transferred }
+}
+
 /** The note on my budget's charge for the part of a date expense the shared fund couldn't cover. */
 export const OVERSPEND = 'Date budget overspend'
 
@@ -34,7 +49,7 @@ export function overspendsFor(s: AppState, d: DateRef, dates: DateRef[] = []): T
 
 /**
  * The plan for a period. A period nobody has edited yet inherits the latest earlier plan's income, fixed costs,
- * savings, caps and monthly budget (not extras, reservations or trip funds, which are one-offs).
+ * savings, the date budget set-aside, caps and monthly budget (not extras, reservations or trip funds, which are one-offs).
  */
 export function planFor(s: AppState, key: string): Plan {
   const own = s.plans[key]
@@ -42,7 +57,7 @@ export function planFor(s: AppState, key: string): Plan {
   const prev = Object.keys(s.plans).filter((k) => k < key).sort().pop()
   if (prev == null) return normPlan()
   const p = s.plans[prev]
-  return { income: p.income, lines: p.lines.filter((l) => l.kind === 'FIXED' || l.kind === 'SAVINGS').map((l) => ({ ...l, added: undefined, paid: undefined })), caps: p.caps, budget: p.budget, savingsTarget: p.savingsTarget }
+  return { income: p.income, lines: p.lines.filter((l) => l.kind === 'FIXED' || l.kind === 'SAVINGS' || l.tag === 'date').map((l) => ({ ...l, added: undefined, paid: undefined })), caps: p.caps, budget: p.budget, savingsTarget: p.savingsTarget }
 }
 
 /**

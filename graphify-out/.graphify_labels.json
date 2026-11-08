@@ -1,10 +1,7 @@
 {
   "0": "ExpenseScreen.tsx",
   "1": "BudgetScreen.tsx",
-  "2": "DateScreen.tsx",
   "3": "ai.ts",
-  "5": "core.test.ts",
-  "6": "state.ts",
   "7": "Budgeter Web",
   "8": "sheets.ts",
   "16": "AGENTS.md",

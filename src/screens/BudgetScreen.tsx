@@ -4,7 +4,7 @@ import { addDays, daysBetween, nextPeriod, prevPeriod, todayIso } from '../core/
 import { digits, div, money, parseMoney, plain } from '../core/money'
 import { addLine, editPlan, removeLine, setReserved, isSpentReserve } from '../data/actions'
 import {
-  available, currency, monthSaved, periodFromKey, periodOf, planFor, planTotal, reserved, savedToDate, savingsHistory, snapshot, spendable, spent,
+  available, currency, dailyAverage, monthSaved, perDayLeft, periodFromKey, periodOf, planFor, planTotal, reserved, savedToDate, savingsHistory, snapshot, spendable, spent,
 } from '../data/ledger'
 import { AppState, LINE_KINDS, LineKind, Plan, Planned, normLine } from '../data/state'
 import { store, useAppState } from '../data/store'
@@ -52,7 +52,7 @@ function PastMonths({ st, upTo, cur }: { st: AppState; upTo: string; cur: string
           <Body style={{ flex: 1 }}>{monthName(m.key)}</Body>
           <View style={{ alignItems: 'flex-end' }}>
             <Text style={[Type.body, { color: m.saved < 0 ? Px.red : Px.green }]}>{(m.saved > 0 ? '+' : '') + money(m.saved, cur)}</Text>
-            <Small>{'Total ' + money(m.total, cur)}</Small>
+            <Small>{`${money(dailyAverage(st, m.key), cur)}/day spent · total ${money(m.total, cur)}`}</Small>
           </View>
         </View>
       ))}
@@ -168,6 +168,7 @@ function BudgetWindow({ st, pkey, plan, cur }: { st: AppState; pkey: string; pla
   const avail = available(st, pkey)
   const spend = spendable(st, pkey)
   const sp = spent(st, p)
+  const saved = monthSaved(st, pkey) // what the month saves if nothing more is spent
   const [text, setText] = useKeyed(() => (plan.budget != null ? plain(plan.budget, cur) : ''), [pkey, plan.budget])
   const v = text.trim() === '' ? null : parseMoney(text, cur)
   const room = avail + planTotal(plan, 'RESERVE') // reservations come off the budget, so they don't count against it here
@@ -177,12 +178,23 @@ function BudgetWindow({ st, pkey, plan, cur }: { st: AppState; pkey: string; pla
   const edit = (f: (x: Plan) => Plan) => store.update((s) => editPlan(s, pkey, f))
   return (
     <Window title="Spendable.exe" header={sp > spend + plan.savingsTarget ? Px.red : sp > spend ? Px.yellow : Px.orange}>
-      <Label>Spendable this month</Label>
-      <Text style={[Type.hero, { color: spend < 0 || sp > spend ? Px.red : Px.brown }]}>{money(spend, cur)}</Text>
-      <Small>{`Spent so far ${money(sp, cur)}` + (
+      <View style={{ flexDirection: 'row', flexWrap: 'wrap', alignItems: 'flex-end', columnGap: 16, rowGap: 8 }}>
+        <View style={{ flexGrow: 1, gap: 4 }}>
+          <Label>Spendable this month</Label>
+          <Text style={[Type.hero, { color: spend < 0 || sp > spend ? Px.red : Px.brown }]}>{money(spend, cur)}</Text>
+        </View>
+        <View style={{ gap: 4 }}>
+          <Label>{p.end <= todayIso() ? 'Saved this month' : 'Saved so far'}</Label>
+          <Text style={[Type.number, { color: saved < 0 ? Px.red : Px.green }]}>{money(saved, cur)}</Text>
+        </View>
+      </View>
+      <Small>{`${p.end <= todayIso() ? 'Spent' : 'Spent so far'} ${money(sp, cur)}` + (
         sp > spend + plan.savingsTarget ? ` · over by ${money(sp - spend - plan.savingsTarget, cur)}`
           : sp > spend ? ` · ${money(sp - spend, cur)} into savings` : ''
       )}</Small>
+      {/* A finished month: what it averaged a day. This month: what's left a day. */}
+      {p.end <= todayIso() ? <Small>{`Spent ${money(dailyAverage(st, pkey), cur)} a day on average`}</Small>
+        : p.start <= todayIso() && <Small>{`${money(perDayLeft(st), cur)} a day for the ${daysBetween(todayIso(), p.end)} days left, today included`}</Small>}
       <View style={fieldRow}>
         <PixelField value={text} onChange={setText} label="Monthly budget (what you plan to spend)" style={{ flex: 1 }} keyboard="decimal-pad"
           placeholder={plain(Math.max(avail, 0), cur)} error={text.trim() !== '' && v == null ? 'Not a number' : null} />
@@ -224,7 +236,6 @@ function LinesWindow({ title, kind, pkey, plan, cur, hint }: { title: string; ki
   return (
     <FoldWindow title={total > 0 ? `${title} · ${money(total, cur)}` : title}>
       <LineEditor kind={kind} pkey={pkey} plan={plan} cur={cur} />
-      {total > 0 && <KeyValue k={`Total in ${pkey}`} v={money(total, cur)} />}
       <Small>{hint}</Small>
     </FoldWindow>
   )
@@ -243,6 +254,7 @@ function LineEditor({ kind, pkey, plan, cur }: { kind: LineKind; pkey: string; p
         <CloseButton onPress={() => store.update((s) => removeLine(s, pkey, l.id))} />
       </View>
     ))}
+    {planTotal(plan, kind) > 0 && <KeyValue k={`Total in ${pkey}`} v={money(planTotal(plan, kind), cur)} />}
     <View style={{ ...fieldRow, gap: 6 }}>
       <PixelField value={name} onChange={setName} label="Name" style={{ flex: 1.4 }} />
       <PixelField value={amount} onChange={setAmount} label="Amount" style={{ flex: 1 }} keyboard="decimal-pad" />

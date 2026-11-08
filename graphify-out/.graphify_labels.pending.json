@@ -1,5 +1,15 @@
 {
+  "2": "client.ts",
   "4": "HomeScreen.tsx",
+  "5": "ExpenseScreen.tsx",
+  "6": "records.ts",
   "9": "package.json",
-  "10": "expo"
+  "10": "expo",
+  "11": "core.test.ts",
+  "12": "DateScreen.tsx",
+  "13": "actions.ts",
+  "14": "store.ts",
+  "15": "state.ts",
+  "17": "newId",
+  "19": "core/money.ts"
 }

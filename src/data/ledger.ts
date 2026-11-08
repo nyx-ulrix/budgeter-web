@@ -81,6 +81,15 @@ export const cashOut = (t: Txn): number =>
   t.payer === ME ? t.total - sum(t.paidBack.filter((w) => w !== ME).map((w) => t.shares[w] ?? 0))
     : t.paidBack.includes(ME) ? myShare(t) : 0
 
+/**
+ * The part of the bank balance that is savings: the starting balance plus what every finished month saved
+ * (this month's money and anything set aside for later aren't in it). Undefined before a balance is entered.
+ */
+export function bankSavings(s: AppState, date: string = todayIso()): number | undefined {
+  const bank = s.setup?.bank
+  return bank ? bank.amount + savedToDate(s, periodOf(s, date).key, date) : undefined
+}
+
 /** The day before the first budget month: a bank balance from then means everything logged since counts. */
 export function bankStart(s: AppState): string {
   const first = Object.keys(s.plans).sort()[0]
@@ -130,6 +139,18 @@ export function spendable(s: AppState, key: string, asOf?: string): number {
 const inBudget = (t: Txn, p: Period) => !t.deleted && t.tripId == null && inPeriod(p, t.date)
 
 export const spent = (s: AppState, p: Period): number => sum(s.txns.filter((t) => inBudget(t, p)).map(budgetImpact))
+
+/** What a month's budget spending came to per day, on average over all its days (whole minor units, rounded down). */
+export function dailyAverage(s: AppState, key: string): number {
+  const p = periodFromKey(s, key)
+  return Math.trunc(spent(s, p) / Math.max(daysBetween(p.start, p.end), 1))
+}
+
+/** What I can spend per day for the rest of the month from [date] on, today included: what's left ÷ days left. */
+export function perDayLeft(s: AppState, date: string = todayIso()): number {
+  const p = periodOf(s, date)
+  return Math.trunc((spendable(s, p.key) - spent(s, p)) / Math.max(daysBetween(date, p.end), 1))
+}
 
 export interface Snapshot {
   period: Period

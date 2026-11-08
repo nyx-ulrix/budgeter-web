@@ -2,7 +2,7 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { AppState, Loose, ME, Txn, budgetImpact, normLine, normPlan, normPlanned, normSetup, normState, normTrip, normTxn, normTxnItem } from './state'
-import { activeTrip, available, monthSaved, planFor, planSpendable, bankBalance, bankStart, OVERSPEND, overspendsFor, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
+import { activeTrip, available, dailyAverage, monthSaved, perDayLeft, planFor, planSpendable, bankBalance, bankSavings, bankStart, OVERSPEND, overspendsFor, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
 import { withReserved, buyNow, chargeOverspend, deletePlanned, deleteTxn, dropOverspends, isSpentReserve, removeLine, saveTxn } from './actions'
 
 const setup = { country: 'SG', currency: 'SGD', startDay: 1, name: '' }
@@ -125,6 +125,8 @@ test('unspent money becomes savings', () => {
   assert.equal(spendable(st, '2026-10'), 150_000) // budget carries over
   assert.equal(savedToDate(st, '2026-10', '2026-10-15'), 80_000) // only finished months
   assert.equal(savedToDate(st, '2026-09', '2026-09-20'), 0)
+  assert.equal(dailyAverage(st, '2026-09'), Math.trunc(120_000 / 30)) // 120k over September's 30 days
+  assert.equal(perDayLeft(st, '2026-09-21'), Math.trunc((150_000 - 120_000) / 10)) // 30k left over 21–30 Sep
   assert.deepEqual(savingsHistory(st, '2026-11-15'), [ // Oct inherits Sep's plan and spends nothing
     { key: '2026-09', saved: 80_000, total: 80_000 },
     { key: '2026-10', saved: 200_000, total: 280_000 },
@@ -210,6 +212,11 @@ test('bank balance: entered balance plus what moved after its day', () => {
   })
   assert.equal(bankBalance(state({}), '2026-10-31'), undefined)
   assert.equal(bankStart(st), '2026-09-30') // the day before the first budget month
+  assert.equal(bankSavings(state({}), '2026-11-15'), undefined)
+  const started = { ...st, setup: { ...st.setup!, bank: { amount: 100_000, date: '2026-09-30' } } }
+  // Starting balance plus what October saved: 300k income + 5k gift − 100k rent − 9k reserved − 23k spent (my share, trips excluded).
+  assert.equal(bankSavings(started, '2026-11-15'), 100_000 + monthSaved(started, '2026-10'))
+  assert.equal(bankSavings(started, '2026-10-20'), 100_000) // October hasn't ended: none of it counts yet
   assert.equal(bankBalance(st, '2026-10-15'), 500_000)
   assert.equal(bankBalance(st, '2026-10-31'), 500_000 + 5_000 - 2_000 - 6_000 - 6_000)
   // November's plan (carried over) lands on 1 Nov: income in, rent out.

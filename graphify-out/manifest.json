@@ -102,15 +102,15 @@
     "semantic_hash": "be915eab954989f6715a940c4d86e74e"
   },
   "src/data/ledger.test.ts": {
-    "mtime": 1793499903.54029,
-    "seen": 1793499980.1533535,
-    "ast_hash": "e7a1eff47ac0f5c3821661c70ff8979c",
+    "mtime": 1794096574.1621623,
+    "seen": 1794096809.2179708,
+    "ast_hash": "81e62bf91a74a3a3765a7575ee34d74b",
     "semantic_hash": ""
   },
   "src/data/ledger.ts": {
-    "mtime": 1793499887.1025772,
-    "seen": 1793499980.1533544,
-    "ast_hash": "eb56944d5d18fd8404709f09a97e72a0",
+    "mtime": 1794096542.7081487,
+    "seen": 1794096809.2179725,
+    "ast_hash": "08bdecd87092d678b43d63d645a842db",
     "semantic_hash": ""
   },
   "src/data/rates.ts": {
@@ -150,9 +150,9 @@
     "semantic_hash": "fa07a800a19ee41cc914e4385dcf882b"
   },
   "src/screens/BudgetScreen.tsx": {
-    "mtime": 1793499274.2184668,
-    "seen": 1793499980.1533656,
-    "ast_hash": "408a91fcbfaadda35e8bf15e42cca948",
+    "mtime": 1794096651.9850976,
+    "seen": 1794096809.2179835,
+    "ast_hash": "5341ac86674e694c0627b319b620352e",
     "semantic_hash": ""
   },
   "src/screens/ExpenseScreen.tsx": {
@@ -162,9 +162,9 @@
     "semantic_hash": ""
   },
   "src/screens/HomeScreen.tsx": {
-    "mtime": 1793497556.2475805,
-    "seen": 1793499980.153369,
-    "ast_hash": "cc33c91f64f7f3d0f8b1a0f9d1f09006",
+    "mtime": 1794096651.9852006,
+    "seen": 1794096809.217987,
+    "ast_hash": "7ab896c2e611cb25d0b725aa73edc1b7",
     "semantic_hash": ""
   },
   "src/screens/PlannedScreen.tsx": {

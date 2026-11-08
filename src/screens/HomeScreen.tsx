@@ -2,7 +2,7 @@ import React, { useState } from 'react'
 import { Text, View } from 'react-native'
 import { addDays, Day, daysBetween, Pace, PACE_LABEL, todayIso } from '../core/budget'
 import { allocate, money, parseMoney, plain } from '../core/money'
-import { activeTrip, bankBalance, bankStart, currency, dailyImpact, liveTxns, snapshot, Snapshot, tripFund, tripSpent } from '../data/ledger'
+import { activeTrip, bankBalance, bankSavings, bankStart, currency, dailyImpact, liveTxns, snapshot, Snapshot, tripFund, tripSpent } from '../data/ledger'
 import { editSetup } from '../data/actions'
 import { Planned } from '../data/state'
 import { store, useAppState } from '../data/store'
@@ -176,9 +176,15 @@ function BankRow() {
             <PixelButton text={shown ? 'Hide' : 'Show'} onPress={() => setShown(!shown)} kind="secondary" />
           </>}
       </View>
+      {balance != null && (
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <Small style={{ flex: 1 }}>Savings in it</Small>
+          <Text style={[Type.body, { color: Px.green }]}>{shown ? money(bankSavings(st) ?? 0, cur) : '••••••'}</Text>
+        </View>
+      )}
       {balance == null && <Small>Enter what was in your bank before you started Budgeter to check every deduction against it.</Small>}
       {shown && bank && <>
-        <Small>{`${money(bank.amount, cur)} in the bank on ${bank.date}, plus income and extra money, less fixed costs and everything paid since. Different from the bank? Something wasn't logged.`}</Small>
+        <Small>{`${money(bank.amount, cur)} on ${bank.date} plus everything logged since. Savings: that plus what finished months saved.`}</Small>
         <PixelButton text="Starting balance" onPress={() => setEditing(true)} kind="secondary" style={{ alignSelf: 'flex-start' }} />
       </>}
       {editing && <BankDialog onDismiss={() => setEditing(false)} />}

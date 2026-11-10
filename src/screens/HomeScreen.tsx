@@ -167,7 +167,8 @@ function BankRow() {
   const ds = useDate()
   const bank = st.setup?.bank
   // Date expenses come out of my bank: the ones I paid, once the date budget has loaded.
-  const balance = bankBalance(st, todayIso(), ds.phase === 'ready' ? ds.txs.filter((t) => t.kind === 'expense' && t.by === ds.uid) : undefined)
+  const dates = ds.phase === 'ready' ? ds.txs.filter((t) => t.kind === 'expense' && t.by === ds.uid) : undefined
+  const balance = bankBalance(st, todayIso(), dates)
   return (
     <View style={{ gap: 4 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
@@ -182,12 +183,12 @@ function BankRow() {
       {balance != null && (
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
           <Small style={{ flex: 1 }}>Savings in it</Small>
-          <Text style={[Type.body, { color: Px.green }]}>{shown ? money(bankSavings(st) ?? 0, cur) : '••••••'}</Text>
+          <Text style={[Type.body, { color: Px.green }]}>{shown ? money(bankSavings(st, todayIso(), dates) ?? 0, cur) : '••••••'}</Text>
         </View>
       )}
       {balance == null && <Small>Enter what was in your bank before you started Budgeter to check every deduction against it.</Small>}
       {shown && bank && <>
-        <Small>{`${money(bank.amount, cur)} on ${bank.date} plus everything logged since. Savings: that plus what finished months saved.`}</Small>
+        <Small>{`${money(bank.amount, cur)} on ${bank.date} plus everything logged since. Savings: that plus what finished months saved, up to what's in the bank.`}</Small>
         <PixelButton text="Starting balance" onPress={() => setEditing(true)} kind="secondary" style={{ alignSelf: 'flex-start' }} />
       </>}
       {editing && <BankDialog onDismiss={() => setEditing(false)} />}

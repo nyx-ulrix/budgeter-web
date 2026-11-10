@@ -1,12 +1,9 @@
 {
-  "0": "state.ts",
-  "2": "store.ts",
+  "0": "App.tsx",
   "4": "TripScreen.tsx",
   "5": "ExpenseScreen.tsx",
-  "6": "records.ts",
+  "8": "state.ts",
   "9": "package.json",
   "10": "expo",
-  "11": "ExpenseScreen.tsx",
-  "12": "records.test.ts",
-  "19": "MonthBar.tsx"
+  "11": "ExpenseScreen.tsx"
 }

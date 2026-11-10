@@ -2,8 +2,8 @@
 import { test } from 'node:test'
 import assert from 'node:assert/strict'
 import { AppState, Loose, ME, Txn, budgetImpact, normLine, normPlan, normPlanned, normSetup, normState, normTrip, normTxn, normTxnItem } from './state'
-import { DATE_TRANSFER, activeTrip, available, dateContributions, periodFromKey, dailyAverage, monthSaved, perDayLeft, planFor, planSpendable, bankBalance, bankSavings, bankStart, OVERSPEND, overspendsFor, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
-import { withReserved, buyNow, chargeOverspend, deletePlanned, deleteTxn, dropOverspends, isSpentReserve, removeLine, saveTxn, togglePaid } from './actions'
+import { DATE_PAID, DATE_TRANSFER, activeTrip, datePaid, dailyImpact, available, dateContributions, periodFromKey, dailyAverage, monthSaved, perDayLeft, planFor, planSpendable, bankBalance, bankSavings, bankStart, OVERSPEND, overspendsFor, reserved, savedToDate, savingsHistory, snapshot, spendable, tripFund, tripSpent } from './ledger'
+import { withReserved, buyNow, chargeOverspend, deletePlanned, deleteTxn, dropOverspends, isSpentReserve, removeLine, saveTxn, syncDatePaid, togglePaid } from './actions'
 
 const setup = { country: 'SG', currency: 'SGD', startDay: 1, name: '' }
 const oct5 = '2026-10-05'
@@ -217,6 +217,12 @@ test('bank balance: entered balance plus what moved after its day', () => {
   // Starting balance plus what October saved: 300k income + 5k gift − 100k rent − 9k reserved − 23k spent (my share, trips excluded).
   assert.equal(bankSavings(started, '2026-11-15'), 100_000 + monthSaved(started, '2026-10'))
   assert.equal(bankSavings(started, '2026-10-20'), 100_000) // October hasn't ended: none of it counts yet
+  // Never more than what's actually in the bank: a big November purchase leaves less than October saved.
+  const spree = { ...started, txns: [...started.txns, txn({ date: '2026-11-02', total: 500_000 })] }
+  const left = bankBalance(spree, '2026-11-15')!
+  assert.ok(left > 0 && left < 100_000 + monthSaved(started, '2026-10'))
+  assert.equal(bankSavings(spree, '2026-11-15'), left)
+  assert.equal(bankSavings({ ...spree, txns: [...spree.txns, txn({ date: '2026-11-03', total: 2_000_000 })] }, '2026-11-15'), 0) // overdrawn: none
   assert.equal(bankBalance(st, '2026-10-15'), 500_000)
   assert.equal(bankBalance(st, '2026-10-31'), 500_000 + 5_000 - 2_000 - 6_000 - 6_000)
   // November's plan (carried over): income lands on 1 Nov; rent comes off only once ticked as deducted.
@@ -281,4 +287,35 @@ test('date pool: set aside every month, contributions by who paid, transfers to 
   assert.deepEqual(c, { iPaid: 20_000, theyPaid: 4_000, transferred: 15_000, mine: 5_000, theirs: 19_000 })
   // The bank: income 1,000 − the 200 date expense I paid + the 150 she transferred.
   assert.equal(bankBalance(st, '2026-10-31', dates.filter((d) => d.kind === 'expense' && d.by === 'me')), 100_000 - 20_000 + 15_000)
+})
+
+test('date money I paid counts against my budget, less what she transferred me', () => {
+  const aside = normLine({ kind: 'RESERVE', name: 'Date budget', amount: 15_000, tag: 'date' })
+  const st = state({ plans: { '2026-10': normPlan({ income: 300_000, lines: [aside] }) }, txns: [
+    txn({ date: '2026-10-12', total: 2_000, note: OVERSPEND, merchant: 'Dinner' }), // overspend charge already counted
+  ] })
+  const dates = [
+    { date: '2026-10-04', amount: 20_000, kind: 'expense', by: 'me' },
+    { date: '2026-10-12', amount: 18_000, kind: 'expense', by: 'me' },
+    { date: '2026-10-09', amount: 9_000, kind: 'expense', by: 'fang' },
+    { date: '2026-11-03', amount: 5_000, kind: 'expense', by: 'me' },
+  ]
+  const oct = periodFromKey(st, '2026-10')
+  assert.equal(datePaid(st, oct, dates, 'me'), 38_000 - 15_000 - 2_000) // I paid 380; set-aside 150 and charge 20 already count
+  const back = { ...st, txns: [...st.txns, txn({ date: '2026-10-20', total: -5_000, note: DATE_TRANSFER })] }
+  assert.equal(datePaid(back, oct, dates, 'me'), 16_000) // she paid me 50 back
+  assert.equal(datePaid(st, periodFromKey(st, '2026-11'), dates, 'me'), 0) // 50 paid, under the 150 set-aside
+  const synced = syncDatePaid(st, dates, 'me', '2026-11-05')
+  const charge = synced.txns.find((t) => t.note === DATE_PAID)!
+  assert.deepEqual([charge.id, charge.date, charge.total], ['date-paid-2026-10', '2026-10-12', 21_000]) // on my last date that month
+  assert.equal(synced.txns.filter((t) => t.note === DATE_PAID).length, 1) // none for November
+  assert.equal(syncDatePaid(synced, dates, 'me', '2026-11-05'), synced) // nothing changed: same state
+  assert.equal(monthSaved(synced, '2026-10'), monthSaved(st, '2026-10') - 21_000) // savings drop by it
+  assert.equal(dailyImpact(synced, charge), 0) // lowers the month, not that day
+  const repaid = syncDatePaid({ ...synced, txns: [...synced.txns, txn({ date: '2026-10-20', total: -21_000, note: DATE_TRANSFER })] }, dates, 'me', '2026-11-05')
+  assert.ok(!repaid.txns.some((t) => t.id === 'date-paid-2026-10' && !t.deleted)) // paid back in full: charge gone
+  // Not a bank movement once the date expenses themselves come off the bank.
+  const mine = dates.filter((d) => d.by === 'me')
+  assert.equal(bankBalance({ ...synced, setup: { ...setup, bank: { amount: 0, date: '2026-09-30' } } }, '2026-10-31', mine),
+    bankBalance({ ...st, setup: { ...setup, bank: { amount: 0, date: '2026-09-30' } } }, '2026-10-31', mine))
 })

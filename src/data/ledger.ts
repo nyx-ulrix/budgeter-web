@@ -36,6 +36,21 @@ export function dateContributions(s: AppState, p: Period, dates: { date: string;
 /** The note on my budget's charge for the part of a date expense the shared fund couldn't cover. */
 export const OVERSPEND = 'Date budget overspend'
 
+/** The note on my budget's monthly charge for date money I paid beyond my set-aside and overspend charges. */
+export const DATE_PAID = 'Date budget I paid'
+
+/**
+ * What [p]'s date spending costs my budget on top of the set-aside line and the overspend charges: what I paid for
+ * dates less what my partner transferred me, past what those already count. Never below 0 (the set-aside stays as
+ * the minimum). Money I front for my partner is mine unless they pay me back.
+ */
+export function datePaid(s: AppState, p: Period, dates: { date: string; amount: number; kind: string; by: string }[], me: string): number {
+  const { mine } = dateContributions(s, p, dates, me)
+  const line = planFor(s, p.key).lines.find((l) => l.tag === 'date')?.amount ?? 0
+  const charged = sum(liveTxns(s).filter((t) => t.note === OVERSPEND && inPeriod(p, t.date)).map(budgetImpact))
+  return Math.max(mine - line - charged, 0)
+}
+
 type DateRef = { id: string; date: string; note: string }
 
 /**
@@ -98,11 +113,13 @@ export const cashOut = (t: Txn): number =>
 
 /**
  * The part of the bank balance that is savings: the starting balance plus what every finished month saved
- * (this month's money and anything set aside for later aren't in it). Undefined before a balance is entered.
+ * (this month's money and anything set aside for later aren't in it), never more than what's actually in the bank
+ * ([bankBalance], with the same [dates]). Undefined before a balance is entered.
  */
-export function bankSavings(s: AppState, date: string = todayIso()): number | undefined {
+export function bankSavings(s: AppState, date: string = todayIso(), dates?: { date: string; amount: number }[]): number | undefined {
   const bank = s.setup?.bank
-  return bank ? bank.amount + savedToDate(s, periodOf(s, date).key, date) : undefined
+  if (!bank) return undefined
+  return Math.min(bank.amount + savedToDate(s, periodOf(s, date).key, date), Math.max(bankBalance(s, date, dates)!, 0))
 }
 
 /** The day before the first budget month: a bank balance from then means everything logged since counts. */
@@ -118,7 +135,8 @@ export function bankStart(s: AppState): string {
  * a month that hasn't ended counts only once it's ticked as deducted, on the day it was ticked. Money set aside
  * (savings, reservations, trip funds) is still in the bank.
  * With [dates] (the date budget expenses I paid, once the date budget has loaded), those come off on their days, and
- * my monthly share and the overspend charges don't: they're how the budget counts that money, not bank movements.
+ * my monthly share, the overspend charges and the date-paid charges don't: they're how the budget counts that money,
+ * not bank movements.
  * Without it, my share and the charges stand in for date spending.
  */
 export function bankBalance(s: AppState, date: string = todayIso(), dates?: { date: string; amount: number }[]): number | undefined {
@@ -135,7 +153,7 @@ export function bankBalance(s: AppState, date: string = todayIso(), dates?: { da
       if (l.kind === 'FIXED' && !(dates && l.tag === 'date') && (l.paid != null ? after(l.paid) : ended && after(l.added ?? p.start))) total -= l.amount
     }
   }
-  const paid = liveTxns(s).filter((t) => after(t.date) && !(dates && t.note === OVERSPEND))
+  const paid = liveTxns(s).filter((t) => after(t.date) && !(dates && (t.note === OVERSPEND || t.note === DATE_PAID)))
   return total - sum(paid.map(cashOut)) - sum((dates ?? []).filter((d) => after(d.date)).map((d) => d.amount))
 }
 
@@ -218,10 +236,11 @@ export function makeSnapshot(b: SnapshotBase): Snapshot {
 }
 
 /**
- * The part of a transaction that uses up the day's budget: everything except monthly categories.
+ * The part of a transaction that uses up the day's budget: everything except monthly categories and date-paid charges.
  * Itemised bills with per-item categories are split across them.
  */
 export function dailyImpact(s: AppState, t: Txn): number {
+  if (t.note === DATE_PAID) return 0 // a month's date money: lowers the month, not that day
   if (t.items.some((i) => i.category != null)) {
     return sum(allocate(budgetImpact(t), t.items.map((i) => Math.max(i.cost, 0)))
       .filter((_, i) => !s.monthlyCategories.includes(t.items[i].category ?? t.category)))

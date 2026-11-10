@@ -19,7 +19,9 @@ import { ExpenseScreen } from './src/screens/ExpenseScreen'
 import { PlannedScreen } from './src/screens/PlannedScreen'
 import { TripScreen } from './src/screens/TripScreen'
 import { SetupScreen } from './src/screens/SetupScreen'
-import { resume as resumeDate } from './src/date/client'
+import { resume as resumeDate, useDate } from './src/date/client'
+import { syncDatePaid } from './src/data/actions'
+import { todayIso } from './src/core/budget'
 
 const TABS: { tab: Tab; label: string; glyph: string[] }[] = [
   { tab: 'home', label: 'Home', glyph: Glyphs.home },
@@ -58,6 +60,11 @@ function Root() {
   const st = useAppState()
   const nav = useNav()
   const wide = useWide()
+  const ds = useDate()
+  // Date money I paid beyond my set-aside counts against my budget: kept in step with the date budget.
+  useEffect(() => {
+    if (ds.phase === 'ready' && ds.uid && st.setup) store.update((s) => syncDatePaid(s, ds.txs, ds.uid!, todayIso()))
+  }, [ds, st])
   if (!st.setup) return <View style={{ flex: 1, backgroundColor: Px.cream }}><SetupScreen existing={null} /></View>
   return (
     <ScannerProvider onResult={(receipt, text) => nav.go({ kind: 'expense', receipt, ocrText: text || undefined })}>

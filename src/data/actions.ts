@@ -1,5 +1,5 @@
-import { todayIso } from '../core/budget'
-import { OVERSPEND, overspendsFor, periodOf, planFor, reserved, tripMonthly } from './ledger'
+import { DATE_PAID, OVERSPEND, datePaid, liveTxns, overspendsFor, periodFromKey, periodOf, planFor, reserved, tripMonthly } from './ledger'
+import { inPeriod, nextPeriod, todayIso } from '../core/budget'
 import { AppState, Line, Plan, Planned, Setup, SyncInfo, Trip, TripCost, Txn, myShare, normLine, normPlan, normTxn, normPlanned } from './state'
 
 /** Every state change the UI can make, as pure functions. The store stamps changed records after each one. */
@@ -210,3 +210,26 @@ export const setDaily = (s: AppState, category: string, daily: boolean): AppStat
 })
 
 export const setSync = (s: AppState, f: (x: SyncInfo) => SyncInfo): AppState => ({ ...s, sync: f(s.sync) })
+
+/**
+ * Keeps one "Date budget I paid" charge per budget month in my budget, [datePaid] for that month, dated on my latest
+ * date expense in it. Its id is fixed per month ("date-paid-2026-11"), so every device writes the same record.
+ * Months before my first budget month are left alone. Returns [s] itself when nothing changes.
+ */
+export function syncDatePaid(s: AppState, dates: { date: string; amount: number; kind: string; by: string }[], me: string, today: string): AppState {
+  const first = Object.keys(s.plans).sort()[0]
+  if (first == null) return s
+  let out = s
+  for (let p = periodFromKey(s, first); p.start <= today; p = nextPeriod(p)) {
+    const amount = datePaid(out, p, dates, me)
+    const mine = dates.filter((d) => d.kind === 'expense' && d.by === me && inPeriod(p, d.date)).map((d) => d.date).sort()
+    const date = mine[mine.length - 1] ?? p.start
+    const id = `date-paid-${p.key}`
+    out = liveTxns(out).filter((t) => t.note === DATE_PAID && inPeriod(p, t.date) && t.id !== id).reduce((x, t) => deleteTxn(x, t.id), out)
+    const have = liveTxns(out).find((t) => t.id === id)
+    if (amount === 0) { if (have) out = deleteTxn(out, id); continue }
+    if (have?.total === amount && have.date === date) continue
+    out = saveTxn(out, normTxn({ id, date, total: amount, category: 'Other', merchant: 'Date money I paid', note: DATE_PAID }))
+  }
+  return out
+}

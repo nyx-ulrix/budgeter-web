@@ -80,6 +80,17 @@ test('daily budget adjusts after overspend', () => {
   const groceries = today(31_000, [daySpend(0), daySpend(0, 2_500)], 0, 0, '2026-10-03', p)
   assert.equal(groceries.bonus, 0)
   assert.equal(groceries.budget, 982)
+  // Bought today: groceries past the leftovers lower today's budget at once, not from tomorrow.
+  const shop = today(31_000, [daySpend(500), daySpend(0)], 0, 2_500, '2026-10-03', p) // 1,500 leftovers, 29 days
+  assert.equal(shop.bonus, 0)
+  assert.equal(shop.budget, 965) // (30,500 − 2,500) ÷ 29
+  const small = today(31_000, [daySpend(500), daySpend(0)], 0, 1_000, '2026-10-03', p)
+  assert.equal(small.budget, 1_000) // leftovers cover it
+  assert.equal(small.bonus, 500)
+  // An overspend today shows what every later day becomes.
+  assert.equal(today(31_000, [], 5_000, 0, '2026-10-01', p).next, 866) // 26,000 ÷ 30
+  assert.equal(today(31_000, [], 500, 0, '2026-10-01', p).next, 1_000) // under budget: later days hold
+  assert.equal(today(31_000, Array.from({ length: 30 }, () => daySpend(1_000)), 0, 0, '2026-10-31', p).next, undefined)
 })
 
 test('pacing', () => {

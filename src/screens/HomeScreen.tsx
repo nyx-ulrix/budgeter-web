@@ -55,6 +55,7 @@ export function HomeScreen() {
         <View style={{ flexDirection: 'row', gap: 12, flexWrap: 'wrap' }}>
           <Small>Today's budget {money(snap.day.budget, cur)}</Small>
           <Small>Spent {money(snap.day.spent, cur)}</Small>
+          {snap.day.next != null && snap.day.next < snap.day.budget && <Small>From tomorrow {money(snap.day.next, cur)} a day</Small>}
           {ds.phase === 'ready' && <Small>Date budget {money(monthLeft(ds.all, snap.period), cur)} left</Small>}
         </View>
         <PixelProgress

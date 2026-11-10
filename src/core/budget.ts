@@ -61,10 +61,12 @@ export interface Day {
   remaining: number
   /** Saved-up money still unused after today's spending. */
   bonusLeft: number
+  /** Each later day's budget if nothing more is spent today; undefined on the period's last day. */
+  next?: number
 }
 
-export const makeDay = (budget: number, spent: number, bonus = 0): Day => ({
-  budget, spent, bonus,
+export const makeDay = (budget: number, spent: number, bonus = 0, next?: number): Day => ({
+  budget, spent, bonus, next,
   available: budget + bonus,
   dailyLeft: budget - spent,
   remaining: budget + bonus - spent,
@@ -99,10 +101,15 @@ export function today(spendable: number, before: DaySpend[], spentToday: number,
     bonus = clamp(bonus + budget - s.daily - s.monthly, 0, Math.max(avail - s.daily - s.monthly, 0))
     d = addDays(d, 1)
   })
-  const avail = pool(spendable)
-  bonus = Math.min(bonus, avail)
-  const budget = div(avail - bonus, Math.max(daysBetween(date, p.end), 1))
-  return makeDay(budget, spentToday, clamp(bonus - monthlyToday, 0, avail))
+  // Monthly spending today uses the leftovers first, then lowers today's budget along with every later day's.
+  const avail = Math.max(pool(spendable) - monthlyToday, 0)
+  bonus = clamp(Math.min(bonus, pool(spendable)) - monthlyToday, 0, avail)
+  const days = Math.max(daysBetween(date, p.end), 1)
+  const budget = div(avail - bonus, days)
+  // Tomorrow on: today's spending past its budget and the leftovers lowers every remaining day straight away.
+  const rest = Math.max(avail - spentToday, 0)
+  const next = days > 1 ? div(rest - clamp(bonus + budget - spentToday, 0, rest), days - 1) : undefined
+  return makeDay(budget, spentToday, bonus, next)
 }
 
 /** Spending speed against an even pace through the month. Being over the whole budget is separate (Snapshot.over). */
